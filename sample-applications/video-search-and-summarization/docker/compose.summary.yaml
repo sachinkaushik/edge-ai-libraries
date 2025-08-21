@@ -16,8 +16,8 @@ services:
         condition: service_healthy
       rabbitmq-service:
         condition: service_healthy
-      audio-analyzer:
-        condition: service_healthy
+      # audio-analyzer:
+      #   condition: service_healthy
     environment:
       EVAM_HOST: ${EVAM_HOST}
       EVAM_DEVICE: ${EVAM_DEVICE}

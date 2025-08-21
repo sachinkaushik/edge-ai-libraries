@@ -9,7 +9,7 @@
                 "name": "object_detection",
                 "source": "gstreamer",
                 "queue_maxsize": 50,
-                "pipeline": "{auto_source} ! decodebin ! videorate ! videoconvertscale ! video/x-raw,framerate={parameters[frame]}/{parameters[chunk_duration]},format=BGR,width=[1,{parameters[frame_width]}],pixel-aspect-ratio=1/1 ! gvadetect name=detection pre-process-backend=ie ! queue ! gvametaconvert ! gvapython arg=[{parameters[frame]},{parameters[chunk_duration]}] class=Publisher function=process module=/home/pipeline-server/gvapython/publisher/publish.py name=publish ! gvametapublish name=destination ! appsink name=appsink",
+                "pipeline": "{auto_source} ! decodebin ! videorate ! videoconvertscale ! video/x-raw,framerate={parameters[frame]}/{parameters[chunk_duration]},format=BGR ! videocrop top=10 bottom=150 left=250 right=250 ! gvadetect name=detection pre-process-backend=ie ! queue ! gvametaconvert ! gvapython arg=[{parameters[frame]},{parameters[chunk_duration]}] class=Publisher function=process module=/home/pipeline-server/gvapython/publisher/publish.py name=publish ! gvametapublish name=destination ! appsink name=appsink",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -25,11 +25,59 @@
                             "maximum": 60,
                             "default": 10
                         },
-                        "frame_width": {
+                        "publish": {
+                            "element": {
+                                "name": "publish",
+                                "property": "kwarg",
+                                "format": "json"
+                            },
+                            "type": "object",
+                            "properties": {
+                                "minio_bucket": {
+                                    "type": "string"
+                                },
+                                "video_identifier": {
+                                    "type": "string"
+                                },
+                                "topic": {
+                                    "type": "string"
+                                }
+                            },
+                            "default": {
+                                "minio_bucket": "videosummtest",
+                                "video_identifier": "video_id_test",
+                                "topic": "topic/video_stream"
+                            }
+                        },
+                        "detection-properties": {
+                            "element": {
+                                "name": "detection",
+                                "format": "element-properties"
+                            }
+                        }
+                    }
+                },
+                "auto_start": false
+            },
+                        {
+                "name": "object_detection_vertical",
+                "source": "gstreamer",
+                "queue_maxsize": 50,
+                "pipeline": "{auto_source} ! decodebin ! videorate ! videoconvertscale ! video/x-raw,framerate={parameters[frame]}/{parameters[chunk_duration]},format=BGR ! videocrop top=150 bottom=150 left=10 right=10 ! gvadetect name=detection pre-process-backend=ie ! queue ! gvametaconvert ! gvapython arg=[{parameters[frame]},{parameters[chunk_duration]}] class=Publisher function=process module=/home/pipeline-server/gvapython/publisher/publish.py name=publish ! gvametapublish name=destination ! appsink name=appsink",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "frame": {
                             "type": "integer",
-                            "minimum": 160,
-                            "maximum": 800,
-                            "default": 480
+                            "minimum": 1,
+                            "maximum": 64, 
+                            "default": 2
+                        },
+                        "chunk_duration" : {
+                            "type": "integer",
+                            "minimum": 2,
+                            "maximum": 60,
+                            "default": 10
                         },
                         "publish": {
                             "element": {
@@ -69,7 +117,7 @@
                 "name": "video_ingestion",
                 "source": "gstreamer",
                 "queue_maxsize": 50,
-                "pipeline": "{auto_source} ! decodebin ! videorate ! videoconvertscale ! video/x-raw,framerate={parameters[frame]}/{parameters[chunk_duration]},format=BGR,width=[1,{parameters[frame_width]}],pixel-aspect-ratio=1/1 ! queue ! gvametaconvert ! gvapython arg=[{parameters[frame]},{parameters[chunk_duration]}] class=Publisher function=process module=/home/pipeline-server/gvapython/publisher/publish.py name=publish ! gvametapublish name=destination ! appsink name=appsink",
+                "pipeline": "{auto_source} ! decodebin ! videorate ! videoconvertscale ! video/x-raw,framerate={parameters[frame]}/{parameters[chunk_duration]},format=BGR,width=[1,{parameters[frame_width]}],pixel-aspect-ratio=1/1 ! videocrop top=100 bottom=100 left=100 right=100 ! queue ! gvametaconvert ! gvapython arg=[{parameters[frame]},{parameters[chunk_duration]}] class=Publisher function=process module=/home/pipeline-server/gvapython/publisher/publish.py name=publish ! gvametapublish name=destination ! appsink name=appsink",
                 "parameters": {
                     "type": "object",
                     "properties": {
