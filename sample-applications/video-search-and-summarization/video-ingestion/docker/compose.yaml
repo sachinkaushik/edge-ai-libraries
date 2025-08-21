@@ -7,7 +7,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: ${REGISTRY}video-ingestion:${TAG:-latest}
+    image: video-ingestion:order-vlm
     hostname: video-ingestion
     read_only: true
     security_opt:
