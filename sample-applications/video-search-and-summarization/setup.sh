@@ -572,7 +572,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n${RED}Failed: Some error occured while setting up one or more containers.${NC}"
     return 1
 fi
-if [ "$2" !=  "config" ]; then
+if [ "$2" !=  "config" ] && [ "$1" != "--down" ]; then
     echo -e "\n${GREEN}Setup completed successfully! 😎"
-    echo -e "Access the UI at: ${YELLOW}http://${HOST_IP}:${APP_HOST_PORT}${NC}"
+    #echo -e "Access the UI at: ${YELLOW}http://${HOST_IP}:${APP_HOST_PORT}${NC}"
 fi
