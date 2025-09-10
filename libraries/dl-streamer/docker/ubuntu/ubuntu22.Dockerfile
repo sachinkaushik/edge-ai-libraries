@@ -36,7 +36,7 @@ FROM ${DOCKER_REGISTRY}ubuntu:22.04 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 ARG BUILD_ARG=Release
 
-LABEL description="This is the development image of Intel® Deep Learning Streamer (Intel® DL Streamer) Pipeline Framework"
+LABEL description="This is the development image of Deep Learning Streamer (DL Streamer) Pipeline Framework"
 LABEL vendor="Intel Corporation"
 
 ARG GST_VERSION=1.26.4
@@ -75,11 +75,11 @@ RUN \
 # Intel NPU drivers and prerequisites installation
 WORKDIR /tmp/npu_deps
 
-RUN curl -L -O https://github.com/oneapi-src/level-zero/releases/download/v1.22.4/level-zero_1.22.4+u22.04_amd64.deb && \
-    curl -L -O https://github.com/intel/linux-npu-driver/releases/download/v1.19.0/intel-driver-compiler-npu_1.19.0.20250707-16111289554_ubuntu22.04_amd64.deb && \
-    curl -L -O https://github.com/intel/linux-npu-driver/releases/download/v1.19.0/intel-fw-npu_1.19.0.20250707-16111289554_ubuntu22.04_amd64.deb && \
-    curl -L -O https://github.com/intel/linux-npu-driver/releases/download/v1.19.0/intel-level-zero-npu_1.19.0.20250707-16111289554_ubuntu22.04_amd64.deb && \
-    apt-get update && apt-get install --no-install-recommends -y /tmp/npu_deps/*.deb && \
+RUN curl -LO https://github.com/oneapi-src/level-zero/releases/download/v1.22.4/level-zero_1.22.4+u22.04_amd64.deb && \
+    dpkg -i level-zero_1.22.4+u22.04_amd64.deb && \
+    curl -LO https://github.com/intel/linux-npu-driver/releases/download/v1.23.0/linux-npu-driver-v1.23.0.20250827-17270089246-ubuntu2204.tar.gz && \
+    tar -xf linux-npu-driver-v1.23.0.20250827-17270089246-ubuntu2204.tar.gz && \
+    dpkg -i ./*.deb && \
     rm -rf /var/lib/apt/lists/* /tmp/npu_deps
 
 WORKDIR /
@@ -456,11 +456,11 @@ RUN \
 # Intel NPU drivers and prerequisites installation
 WORKDIR /tmp/npu_deps
 
-RUN curl -L -O https://github.com/oneapi-src/level-zero/releases/download/v1.22.4/level-zero_1.22.4+u22.04_amd64.deb && \
-    curl -L -O https://github.com/intel/linux-npu-driver/releases/download/v1.19.0/intel-driver-compiler-npu_1.19.0.20250707-16111289554_ubuntu22.04_amd64.deb && \
-    curl -L -O https://github.com/intel/linux-npu-driver/releases/download/v1.19.0/intel-fw-npu_1.19.0.20250707-16111289554_ubuntu22.04_amd64.deb && \
-    curl -L -O https://github.com/intel/linux-npu-driver/releases/download/v1.19.0/intel-level-zero-npu_1.19.0.20250707-16111289554_ubuntu22.04_amd64.deb && \
-    apt-get update && apt-get install --no-install-recommends -y /tmp/npu_deps/*.deb && \
+RUN curl -LO https://github.com/oneapi-src/level-zero/releases/download/v1.22.4/level-zero_1.22.4+u22.04_amd64.deb && \
+    dpkg -i level-zero_1.22.4+u22.04_amd64.deb && \
+    curl -LO https://github.com/intel/linux-npu-driver/releases/download/v1.23.0/linux-npu-driver-v1.23.0.20250827-17270089246-ubuntu2204.tar.gz && \
+    tar -xf linux-npu-driver-v1.23.0.20250827-17270089246-ubuntu2204.tar.gz && \
+    dpkg -i ./*.deb && \
     rm -rf /var/lib/apt/lists/* /tmp/npu_deps
 
 WORKDIR /
