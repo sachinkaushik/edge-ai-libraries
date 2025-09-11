@@ -137,9 +137,9 @@ services:
     devices:
       - ${DRI_MOUNT_PATH}:/dev/dri
     group_add:
-      - ${USER_GROUP_ID-1000} 
-      - ${VIDEO_GROUP_ID-44}    
-      - ${RENDER_GROUP_ID-1002}
+      - ${USER_GROUP_ID:-1000}
+      - ${VIDEO_GROUP_ID:-44}    
+      - ${RENDER_GROUP_ID:-1002}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
