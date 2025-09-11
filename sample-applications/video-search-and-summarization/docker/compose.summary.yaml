@@ -49,7 +49,7 @@ services:
       WORKERS: ${WORKERS:-1}
 
   vlm-openvino-serving:
-    image: ${REGISTRY:-}vlm-openvino-serving:${TAG:-latest}
+    image: vlm-openvino-serving:order-vlm
     ipc: host
     ports:
       - "${VLM_HOST_PORT}:8000"
