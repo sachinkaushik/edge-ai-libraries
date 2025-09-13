@@ -222,7 +222,7 @@ def initialize_model():
     weight = settings.VLM_COMPRESSION_WEIGHT_FORMAT.lower()
     model_dir = model_dir / weight
     logger.info(f"Model_name: {model_name} \b Compression_Weight_Format: {weight}")
-
+    logger.info(f"####### Using DEVICE for model: {settings.VLM_DEVICE.upper()}")
     try:
         if not model_dir.exists():
             convert_model(
