@@ -224,7 +224,9 @@ def initialize_model():
     logger.info(f"Model_name: {model_name} \b Compression_Weight_Format: {weight}")
     logger.info(f"####### Using DEVICE for model: {settings.VLM_DEVICE.upper()}")
     try:
+        logger.info(f"####### in TRY BLOCK: {settings.VLM_DEVICE.upper()}")
         if not model_dir.exists():
+            logger.info(f"####### convert_model: {settings.VLM_DEVICE.upper()}")
             convert_model(
                 model_name,
                 str(model_dir),
@@ -237,20 +239,22 @@ def initialize_model():
 
     try:
         model_config = load_model_config(model_name.split("/")[-1].lower())
+        logger.info(f"MODEL LOADED: {model_config}")
         ov_config = settings.get_ov_config_dict()
-        logger.debug(f"Using OpenVINO configuration: {ov_config}")
-        if ModelNames.PHI in model_name.lower():
+        logger.info(f"Using OpenVINO configuration: {ov_config}")
+        if ModelNames.PHI in model_name.lower():            
             pipe = OVModelForVisualCausalLM.from_pretrained(
                 model_dir,
                 device=settings.VLM_DEVICE.upper(),
                 trust_remote_code=True,
                 use_cache=False,
                 ov_config=ov_config
-            )
+            )            
             processor = AutoProcessor.from_pretrained(
                 model_name, trust_remote_code=True
             )
         elif ModelNames.QWEN in model_name.lower():
+            logger.info("IN IF BLOCK  ModelNames:")
             if not model_config:
                 raise RuntimeError("Model configuration is empty or invalid.")
             pipe = OVModelForVisualCausalLM.from_pretrained(
@@ -260,6 +264,7 @@ def initialize_model():
                 use_cache=False,
                 ov_config=ov_config
             )
+            logger.info(f"IN IF BLOCK  pipe: {pipe}")
             processor = AutoProcessor.from_pretrained(
                 model_dir,
                 trust_remote_code=True,
@@ -270,7 +275,7 @@ def initialize_model():
             pipe = ov_genai.VLMPipeline(model_dir, device=settings.VLM_DEVICE.upper(), **ov_config)
             processor = None  # No processor needed for this case
         model_ready = is_model_ready(model_dir)
-        logger.debug("Model is ready")
+        logger.info("Model is ready")
     except Exception as e:
         logger.error(f"Error initializing the model: {e}")
         raise RuntimeError(f"Error initializing the model: {e}")
