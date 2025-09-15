@@ -15,7 +15,7 @@ RUN poetry config virtualenvs.create false && poetry install --no-root --only=ma
 
 FROM python:3.12.10-slim
 
-ARG INSTALL_DRIVER_VERSION="24.39.31294"
+ARG INSTALL_DRIVER_VERSION="25.31.3466"
 ARG USER_ID=1000
 ARG USER_GROUP_ID=1000
 
@@ -29,9 +29,9 @@ COPY --from=build /usr/local/lib/python3.12/site-packages /usr/local/lib/python3
 COPY --from=build /usr/local/bin /usr/local/bin
 COPY --from=build /app/poetry.lock /app/poetry.lock
 
-#COPY ./scripts/install_ubuntu_gpu_drivers.sh /tmp/install_gpu_drivers.sh
-#RUN chmod +x /tmp/install_gpu_drivers.sh
-#RUN /tmp/install_gpu_drivers.sh
+COPY ./scripts/install_ubuntu_gpu_drivers.sh /tmp/install_gpu_drivers.sh
+RUN chmod +x /tmp/install_gpu_drivers.sh
+RUN /tmp/install_gpu_drivers.sh
 
 RUN apt-get clean && rm -rf /tmp/install_gpu_drivers.sh && rm -rf /var/lib/apt/lists/* && rm -rf /tmp/* && rm -rf /root/.cachetmp/*
 
