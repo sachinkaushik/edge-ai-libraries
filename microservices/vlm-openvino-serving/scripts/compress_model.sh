@@ -6,7 +6,7 @@
 VLM_MODEL_NAME=$1
 VLM_COMPRESSION_WEIGHT_FORMAT=$2
 HUGGINGFACE_TOKEN=$3
-
+source $(poetry env info --path)/bin/activate
 MODEL_DIR=$(echo $VLM_MODEL_NAME | awk -F/ '{print $NF}')
 MODEL_DIR="ov-model/$MODEL_DIR/$VLM_COMPRESSION_WEIGHT_FORMAT"
 
