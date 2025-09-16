@@ -1,41 +1,27 @@
-# Copyright (C) 2025 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-
-FROM python:3.12.10-slim AS build
-
-RUN pip install --upgrade --no-cache-dir pip setuptools
-
-RUN pip install --no-cache-dir poetry
-
-WORKDIR /app
-
-COPY pyproject.toml poetry.lock /app/
-
-RUN poetry config virtualenvs.create false && poetry install --no-root --only=main
-
-FROM python:3.12.10-slim
+FROM ubuntu:24.04
 
 ARG INSTALL_DRIVER_VERSION="25.31.34666"
-ARG USER_ID=1000
-ARG USER_GROUP_ID=1000
 
-RUN groupadd -g ${USER_GROUP_ID} appuser && useradd -m -s /bin/bash -u ${USER_ID} -g ${USER_GROUP_ID} appuser
-
-RUN apt-get update -y && apt-get install -y --no-install-recommends --fix-missing \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    python3-pip \
     curl \
-    && rm -rf /var/lib/apt/lists/* 
+    wget \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=build /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=build /usr/local/bin /usr/local/bin
-COPY --from=build /app/poetry.lock /app/poetry.lock
+WORKDIR /app    
+# Install Poetry globally
 
-COPY ./scripts/install_ubuntu_gpu_drivers.sh /tmp/install_gpu_drivers.sh
-RUN chmod +x /tmp/install_gpu_drivers.sh
-RUN /tmp/install_gpu_drivers.sh
+RUN pip install poetry --break-system-packages
 
-RUN apt-get clean && rm -rf /tmp/install_gpu_drivers.sh && rm -rf /var/lib/apt/lists/* && rm -rf /tmp/* && rm -rf /root/.cachetmp/*
+# Copy project metadata and install deps
+COPY pyproject.toml poetry.lock /app/
+RUN poetry install --no-root
 
-# Optionally download copyleft sources if requested
 ARG COPYLEFT_SOURCES=false
 RUN if [ "$COPYLEFT_SOURCES" = "true" ]; then \
         apt-get update && \
@@ -67,16 +53,24 @@ RUN if [ "$COPYLEFT_SOURCES" = "true" ]; then \
         done; \
         apt-get remove --purge -y gcc build-essential libffi-dev python3-dev; \
     fi
-    
-WORKDIR /app
+
+
+
+# Copy source code and scripts
 COPY . .
 RUN chmod +x /app/scripts/compress_model.sh
 
-RUN mkdir -p /home/appuser/.cache/huggingface /app/ov-model && \
-    chown -R appuser:appuser /home/appuser/.cache /app/ov-model
+# Install Intel GPU drivers
+COPY ./scripts/install_ubuntu_gpu_drivers.sh /tmp/install_gpu_drivers.sh
+RUN chmod +x /tmp/install_gpu_drivers.sh && /tmp/install_gpu_drivers.sh ${INSTALL_DRIVER_VERSION}
 
-USER appuser
+# Clean up
+RUN apt-get clean && rm -rf /tmp/install_gpu_drivers.sh /var/lib/apt/lists/* /tmp/* /root/.cachetmp/*
+
+# Create cache and model directories
+RUN mkdir -p /root/.cache/huggingface /app/ov-model
 
 EXPOSE 8000
 
-CMD ["/bin/bash", "-c", "/app/scripts/compress_model.sh ${VLM_MODEL_NAME} ${VLM_COMPRESSION_WEIGHT_FORMAT} ${HUGGINGFACE_TOKEN} && gunicorn -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker src.app:app --timeout 10000 -w ${WORKERS:-1} --log-level ${VLM_OPENVINO_LOG_LEVEL:-info} --access-logfile ${VLM_ACCESS_LOG_FILE:--} --error-logfile -"]
+# Run compression + app
+CMD ["/bin/bash", "-c", "/app/scripts/compress_model.sh ${VLM_MODEL_NAME} ${VLM_COMPRESSION_WEIGHT_FORMAT} ${HUGGINGFACE_TOKEN} && poetry run gunicorn -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker src.app:app --timeout 10000 -w ${WORKERS:-1} --log-level ${VLM_OPENVINO_LOG_LEVEL:-info} --access-logfile ${VLM_ACCESS_LOG_FILE:--} --error-logfile -"]
