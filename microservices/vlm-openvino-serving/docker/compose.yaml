@@ -43,7 +43,7 @@ services:
     networks:
       - my_network
     volumes:
-      - ov-models:/home/appuser/.cache/huggingface
+      - ov-models:/root/.cache/huggingface
       - ov-models:/app/ov-model
 volumes:
   ov-models:
