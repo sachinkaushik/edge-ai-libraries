@@ -11,27 +11,33 @@
 </div>
 hide_directive-->
 
-Scene Understanding Service is a microservice for multi-scene behavioral
-analysis and suspicious activity detection. It subscribes to
+Scene Understanding Service is a generic microservice for multi-scene
+behavioral analysis. It subscribes to
 [SceneScape](https://github.com/open-edge-platform/scenescape) MQTT topics to
-track people across configured scenes and zones, applies a declarative rule
-engine to detect suspicious patterns (loitering, checkout bypass, concealment,
-restricted-zone violations), and routes the resulting alerts to a downstream
-alert service. It is designed to be dropped into any SceneScape-based
-deployment by supplying two YAML config files — no code changes required.
+consume scene events and track objects across configured scenes and zones,
+applies a declarative rule engine to interpret those events, and routes the
+resulting alerts to a downstream alert service. Because all behavior is defined
+through configuration rather than code, the service is not tied to any single
+use case — suspicious activity detection (loitering, checkout bypass,
+concealment, restricted-zone violations) is just one example, and the same
+engine can power other scene-understanding scenarios. It is designed to be
+dropped into any SceneScape-based deployment by supplying two YAML config
+files — no code changes required.
 
 ## Use Cases
 
+- Generic scene understanding: consume SceneScape events and apply declarative,
+  zone-based behavioral rules for any domain.
 - Retail loss prevention: loitering, repeated high-value-zone visits,
   checkout bypass, and concealment detection.
-- Restricted-area monitoring: alert when a person enters a zone they should
+- Restricted-area monitoring: alert when an object enters a zone it should
   not be in.
 - Any SceneScape deployment that needs declarative, zone-based behavioral
   rules with optional pose/VLM escalation.
 
 ## Key Capabilities
 
-- Multi-scene, multi-camera person tracking driven entirely by SceneScape MQTT.
+- Multi-scene, multi-camera object tracking driven entirely by SceneScape MQTT.
 - Declarative YAML rule engine — thresholds and rules change without code edits.
 - Optional behavioral-analysis escalation (pose + VLM) over MQTT.
 - Zone auto-discovery from the SceneScape REST API at startup.

@@ -1,13 +1,17 @@
 # Scene Understanding Service Microservice
 
-This repository provides a FastAPI-based microservice for multi-scene
-behavioral analysis and suspicious activity detection. It subscribes to
+This repository provides a generic, FastAPI-based microservice for multi-scene
+behavioral analysis. It subscribes to
 [SceneScape](https://github.com/open-edge-platform/scenescape) MQTT topics to
-track people across configured scenes and zones, applies a declarative rule
-engine to detect suspicious patterns (loitering, checkout bypass, concealment,
-restricted-zone violations), and routes the resulting alerts to a downstream
-alert service. It is driven entirely by two YAML config files, so it can be
-dropped into any SceneScape deployment without code changes.
+consume scene events and track objects across configured scenes and zones,
+applies a declarative rule engine to interpret those events, and routes the
+resulting alerts to a downstream alert service. Because all behavior is defined
+through configuration rather than code, the service is not tied to any single
+use case: detecting suspicious activity (loitering, checkout bypass,
+concealment, restricted-zone violations) is just one example of what it can do,
+and the same engine can power other scene-understanding scenarios. It is driven
+entirely by two YAML config files, so it can be dropped into any SceneScape
+deployment without code changes.
 
 Below, you'll find links to detailed documentation to help you get started,
 configure, and deploy the microservice.
