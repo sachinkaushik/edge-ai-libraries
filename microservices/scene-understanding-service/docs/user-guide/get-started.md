@@ -14,6 +14,65 @@ Pick one of the two deployment paths and follow the linked guide.
   service ships with samples under `configs/`; review the
   [Configuration Guide](./get-started/configuration.md) before editing them.
 
+## Configure the Service
+
+All runtime behavior is driven by **two YAML files** in a single directory
+(`/app/configs` by default, or set `CONFIG_DIR`). The image bakes in working
+samples so it starts out-of-the-box; supply your own files via a read-only
+volume mount (e.g. `-v ./configs:/app/configs:ro`) to override them — **no code
+changes required**.
+
+1. **`scene-config.yaml`** — how the service connects to SceneScape and what it
+   watches:
+
+   - `scenescape_api` — SceneScape REST base URL (used for zone auto-discovery).
+   - `mqtt` — broker host/port, TLS, and the SceneScape topic patterns to
+     subscribe to.
+   - `scenes` — the scenes/cameras to track, and a mapping of zone **names**
+     (must match SceneScape region names) to zone **types**
+     (`HIGH_VALUE`, `CHECKOUT`, `EXIT`, `RESTRICTED`).
+   - `seaweedfs` / `alert_service` *(optional)* — evidence-frame storage and
+     the downstream alert endpoint.
+
+2. **`rules.yaml`** — how events are interpreted. This is where you adapt the
+   service to your use case without touching code:
+
+   - `rules` — each rule has a `trigger`, `conditions`, and `actions`
+     (`alert` to raise an alert, or `escalate` to invoke a service).
+   - `variables` / `session_flags` / `settings` — tunable thresholds, flags,
+     and session knobs.
+   - `services` — named escalation services (e.g. behavioral analysis) that
+     rules can invoke.
+
+A minimal `scene-config.yaml` looks like this:
+
+```yaml
+scenescape_api:
+  base_url: https://web.scenescape.intel.com
+  verify_ssl: false
+
+scenes:
+  - scene_name: example-scene
+    cameras:
+      - example-camera1
+    zones:
+      zone1: HIGH_VALUE
+      zone2: CHECKOUT
+
+mqtt:
+  host: broker.scenescape.intel.com
+  port: 1883
+  use_tls: false
+```
+
+A few identity/credential settings are supplied via environment variables
+(`STORE_ID`, `SCENESCAPE_API_USER`, `SCENESCAPE_API_PASSWORD`, `ALERT_SERVICE_URL`).
+MQTT and the SceneScape API URL are configured in `scene-config.yaml`, **not**
+through environment variables.
+
+See the [Configuration Guide](./get-started/configuration.md) for the full
+field list, TLS setup, and how to disable behavioral analysis.
+
 ## Choose Deployment Path
 
 <!--hide_directive::::{tab-set}
