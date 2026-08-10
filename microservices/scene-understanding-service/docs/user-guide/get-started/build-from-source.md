@@ -20,12 +20,6 @@ external source dependencies.
 docker build -t intel/scene-understanding-service:latest .
 ```
 
-To build a locally tagged image for Compose:
-
-```bash
-docker build -t scene-understanding-service:local .
-```
-
 To build an image the bundled `docker-compose.yml` picks up via `.env`, tag it
 to match the `REGISTRY` / `RELEASE_TAG` values you set there (see
 [run-container.md](run-container.md)):
