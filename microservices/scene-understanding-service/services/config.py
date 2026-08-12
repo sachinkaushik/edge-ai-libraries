@@ -50,7 +50,7 @@ class ConfigService:
         self._config_dir = Path(os.environ.get("CONFIG_DIR", "/app/configs"))
         if not self._config_dir.exists():
             # Fallback for local development: configs/ next to src/
-            self._config_dir = Path(__file__).resolve().parent.parent.parent / "configs"
+            self._config_dir = Path(__file__).resolve().parent.parent / "configs"
         _cfg = self._load_yaml("scene-config.yaml")
         self._app_cfg = _cfg
         self._zone_cfg = _cfg
