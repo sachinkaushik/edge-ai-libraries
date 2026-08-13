@@ -268,7 +268,19 @@ class ConfigService:
 
     # ---- seaweedfs ----
     def get_seaweedfs_config(self) -> dict:
-        return self._app_cfg.get("seaweedfs", {})
+        """Return SeaweedFS config from YAML or environment variables."""
+        cfg = self._app_cfg.get("seaweedfs", {})
+        # If not in YAML, check environment variables
+        if not cfg:
+            endpoint = os.environ.get("SEAWEEDFS_ENDPOINT", "")
+            bucket = os.environ.get("SEAWEEDFS_BUCKET", "")
+            if endpoint:
+                cfg = {
+                    "endpoint": endpoint.replace("http://", "").replace("https://", ""),
+                    "bucket": bucket or "behavioral-frames",
+                    "secure": endpoint.startswith("https://"),
+                }
+        return cfg
 
     # ---- external services ----
     def get_behavioral_analysis_config(self) -> dict:
