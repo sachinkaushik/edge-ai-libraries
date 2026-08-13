@@ -234,8 +234,26 @@ async def lifespan(app: FastAPI):
 
     purge_task = asyncio.create_task(_visit_tracker_purge_loop())
 
-    # No UI image polling loop is started in this service.
-    ui_image_task = None
+    # Frame capture loop: continuously request frames from all cameras
+    # for behavioral analysis and UI display
+    cmd_topic = config.get_cmd_topic_pattern()
+    _all_camera_names = [c["name"] for c in config.get_cameras()]
+
+    async def _frame_capture_loop():
+        while True:
+            await asyncio.sleep(0.5)  # ~2 FPS
+            if not mqtt_svc.connected:
+                continue
+            for cam in _all_camera_names:
+                try:
+                    mqtt_svc.publish_raw(
+                        cmd_topic.replace("{camera_name}", cam),
+                        "getimage",
+                    )
+                except Exception:
+                    pass
+
+    frame_capture_task = asyncio.create_task(_frame_capture_loop())
 
     logger.info(
         "Store-wide Loss Prevention started",
@@ -251,8 +269,7 @@ async def lifespan(app: FastAPI):
     await mqtt_svc.stop()
     expiry_task.cancel()
     purge_task.cancel()
-    if ui_image_task is not None:
-        ui_image_task.cancel()
+    frame_capture_task.cancel()
     mqtt_task.cancel()
 
 
