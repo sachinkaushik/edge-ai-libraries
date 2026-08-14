@@ -85,7 +85,7 @@ Use a versioned image tag instead of `latest` for reproducible deployments.
 ```bash
 docker run --rm -p 8082:8082 \
   -v "$PWD/configs:/app/configs:ro" \
-  intel/scene-understanding-service:<release-tag>
+  intel/scene-understanding-service:<RELEASE_TAG>
 ```
 
 Then verify:
