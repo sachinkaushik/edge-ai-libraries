@@ -33,6 +33,35 @@ pip install -e .[fastmcp]     # + standalone FastMCP 2.x backend (gofastmcp.com)
 `to_mcp()` auto-picks whichever backend is installed. Both speak the same MCP
 protocol on the wire.
 
+## Use from another service
+
+For a service that lives in a different repository, consume this library as a
+Git package from `edge-ai-libraries` rather than copying the source tree.
+
+Add this to the service's `pyproject.toml`:
+
+```toml
+dependencies = [
+    "mcp-service-sdk[mcp] @ git+https://github.com/open-edge-platform/edge-ai-libraries.git@<tag-or-commit>#subdirectory=libraries/mcp-service-sdk",
+]
+```
+
+Use a release tag or commit SHA in place of `<tag-or-commit>` so builds stay
+reproducible. Avoid pointing production consumers at `main`.
+
+For local verification during SDK development, you can still install from a
+checkout:
+
+```bash
+pip install -e /absolute/path/to/edge-ai-libraries/libraries/mcp-service-sdk[mcp]
+```
+
+Service code then imports the SDK normally:
+
+```python
+from mcp_service_sdk import ServiceServer
+```
+
 ## Writing a service (the whole job)
 
 A service writes **only** its event schema + read/act tools:
