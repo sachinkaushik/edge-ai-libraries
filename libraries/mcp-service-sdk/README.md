@@ -42,7 +42,7 @@ Add this to the service's `pyproject.toml`:
 
 ```toml
 dependencies = [
-    "mcp-service-sdk[mcp] @ git+https://github.com/open-edge-platform/edge-ai-libraries.git@<tag-or-commit>#subdirectory=libraries/mcp-service-sdk",
+    "mcp-service-sdk[mcp] @ git+https://github.com/sachinkaushik/edge-ai-libraries.git@<tag-or-commit>#subdirectory=libraries/mcp-service-sdk",
 ]
 ```
 
