@@ -6,14 +6,14 @@ import time
 
 import pytest
 
-from mcp_service_sdk import (
+from mcp_service_base import (
     GateLevel,
     JSONLFileLog,
     NullTelemetry,
     ServiceConfig,
     ServiceServer,
 )
-from mcp_service_sdk.envelope import new_event
+from mcp_service_base.envelope import new_event
 
 
 def test_jsonl_file_log_roundtrip_and_idempotency(tmp_path):

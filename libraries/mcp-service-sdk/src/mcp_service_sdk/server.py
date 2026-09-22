@@ -64,6 +64,7 @@ class ServiceConfig:
     webhook_url: str | None = None
     metrics: str = "memory"        # memory | null
     tool_timeout_s: float | None = None
+    expose_subscribe: bool = True
 
 
 @dataclass
@@ -84,6 +85,7 @@ class ServiceServer:
     # Soft per-tool timeout (seconds); None disables. Runs the tool in a worker
     # thread and raises TimeoutError if it overruns.
     tool_timeout_s: float | None = None
+    expose_subscribe: bool = True
 
     _event_types: dict[str, dict] = field(default_factory=dict)
     _read_tools: dict[str, _Tool] = field(default_factory=dict)
@@ -128,6 +130,7 @@ class ServiceServer:
             delivery=delivery,
             telemetry=telemetry,
             tool_timeout_s=cfg.tool_timeout_s,
+            expose_subscribe=cfg.expose_subscribe,
         )
 
     # -- internal invocation (timeout strategy) ---------------------------
@@ -262,8 +265,8 @@ class ServiceServer:
         All three expose the same ``.tool()`` decorator and ``.run()`` API and
         speak the same MCP protocol on the wire. Install one of:
 
-        - ``pip install mcp-service-sdk[mcp]``      (official SDK)
-        - ``pip install mcp-service-sdk[fastmcp]``  (standalone FastMCP 2.x)
+        - ``pip install mcp-service-base[mcp]``      (official SDK)
+        - ``pip install mcp-service-base[fastmcp]``  (standalone FastMCP 2.x)
         """
         try:
             from fastmcp import FastMCP as _Server  # standalone fastmcp 2.x
@@ -276,8 +279,8 @@ class ServiceServer:
                 except ImportError as exc:  # pragma: no cover - env-dependent
                     raise RuntimeError(
                         "No MCP backend found. Install one of: "
-                        "'pip install mcp-service-sdk[mcp]' or "
-                        "'pip install mcp-service-sdk[fastmcp]'"
+                        "'pip install mcp-service-base[mcp]' or "
+                        "'pip install mcp-service-base[fastmcp]'"
                     ) from exc
 
         app = _Server(self.service)
@@ -286,10 +289,11 @@ class ServiceServer:
         def _describe() -> dict:
             return self.describe()
 
-        @app.tool(name="subscribe", description="Subscribe to an event type.")
-        def _subscribe(event_type: str, condition: str, callback_url: str) -> dict:
-            self.subscribe(event_type, condition, callback_url)
-            return {"subscribed": event_type, "condition": condition}
+        if self.expose_subscribe:
+            @app.tool(name="subscribe", description="Subscribe to an event type.")
+            def _subscribe(event_type: str, condition: str, callback_url: str) -> dict:
+                self.subscribe(event_type, condition, callback_url)
+                return {"subscribed": event_type, "condition": condition}
 
         for tool in self._read_tools.values():
             app.tool(name=tool.name, description=tool.description)(
