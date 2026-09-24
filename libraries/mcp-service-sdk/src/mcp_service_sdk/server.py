@@ -17,6 +17,10 @@ library (emit, describe, log, policy) works and is testable without it installed
 from __future__ import annotations
 
 import functools
+import json
+import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -40,6 +44,46 @@ def _docstring(fn: Callable[..., Any]) -> str:
     import inspect
 
     return inspect.getdoc(fn) or ""
+
+
+def _condition_matches(condition: str, event: EventEnvelope) -> bool:
+    """Evaluate the small declarative condition language used by subscribe."""
+    condition = condition.strip()
+    if not condition or condition.lower() in {"*", "true", "all"}:
+        return True
+    if "==" not in condition:
+        return False
+    field, expected = (part.strip() for part in condition.split("==", 1))
+    expected = expected.strip("\"'").lower()
+    if field == "event_type":
+        actual = event.event_type
+    else:
+        actual = event.payload.get(field)
+    return str(actual).lower() == expected
+
+
+def _post_subscription_event(callback_url: str, event: EventEnvelope) -> bool:
+    body = json.dumps({
+        "type": "mcp_event",
+        "event": json.loads(event.to_json()),
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        callback_url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    for attempt in range(3):
+        try:
+            with opener.open(request, timeout=5) as response:
+                if 200 <= response.status < 300:
+                    return True
+        except (urllib.error.URLError, TimeoutError, OSError):
+            if attempt == 2:
+                return False
+        time.sleep(0.5 * (2**attempt))
+    return False
 
 
 @dataclass
@@ -214,6 +258,7 @@ class ServiceServer:
         with self.telemetry.span(f"emit:{event_type}"):
             self.log.append(event)
             self.delivery.dispatch(event)
+            self._notify_subscribers(event)
         return event
 
     def call_action(self, name: str, **args: Any) -> dict[str, Any]:
@@ -231,6 +276,14 @@ class ServiceServer:
 
     def subscribe(self, event_type: str, condition: str, callback_url: str) -> None:
         self._subscriptions.append(_Subscription(event_type, condition, callback_url))
+
+    def _notify_subscribers(self, event: EventEnvelope) -> None:
+        for subscription in self._subscriptions:
+            if subscription.event_type != event.event_type:
+                continue
+            if not _condition_matches(subscription.condition, event):
+                continue
+            _post_subscription_event(subscription.callback_url, event)
 
     def describe(self) -> dict[str, Any]:
         """Self-description rich enough for a coding agent to use unassisted."""
