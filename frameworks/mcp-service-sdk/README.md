@@ -42,7 +42,7 @@ Add this to the service's `pyproject.toml`:
 
 ```toml
 dependencies = [
-    "mcp-service-sdk[mcp] @ git+https://github.com/sachinkaushik/edge-ai-libraries.git@<tag-or-commit>#subdirectory=libraries/mcp-service-sdk",
+    "mcp-service-sdk[mcp] @ git+https://github.com/sachinkaushik/edge-ai-libraries.git@<tag-or-commit>#subdirectory=frameworks/mcp-service-sdk",
 ]
 ```
 
@@ -53,7 +53,7 @@ For local verification during SDK development, you can still install from a
 checkout:
 
 ```bash
-pip install -e /absolute/path/to/edge-ai-libraries/libraries/mcp-service-sdk[mcp]
+pip install -e /absolute/path/to/edge-ai-libraries/frameworks/mcp-service-sdk[mcp]
 ```
 
 Service code then imports the SDK normally:

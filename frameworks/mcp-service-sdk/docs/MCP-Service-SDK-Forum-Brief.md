@@ -59,7 +59,7 @@ The SDK solves the following problems:
 The package is located at:
 
 ```text
-oep/edge-ai-libraries/libraries/mcp-service-sdk
+oep/edge-ai-libraries/frameworks/mcp-service-sdk
 ```
 
 Python package name:
@@ -360,14 +360,14 @@ svc.run(transport="streamable-http", host="0.0.0.0", port=9000)
 Local development:
 
 ```bash
-pip install -e /path/to/edge-ai-libraries/libraries/mcp-service-sdk[mcp]
+pip install -e /path/to/edge-ai-libraries/frameworks/mcp-service-sdk[mcp]
 ```
 
 As a Git package from another service:
 
 ```toml
 dependencies = [
-    "mcp-service-sdk[mcp] @ git+https://github.com/sachinkaushik/edge-ai-libraries.git@<tag-or-commit>#subdirectory=libraries/mcp-service-sdk",
+    "mcp-service-sdk[mcp] @ git+https://github.com/sachinkaushik/edge-ai-libraries.git@<tag-or-commit>#subdirectory=frameworks/mcp-service-sdk",
 ]
 ```
 

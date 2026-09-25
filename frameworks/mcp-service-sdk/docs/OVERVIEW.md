@@ -68,7 +68,7 @@ Released as git tags (`v0.1.0` … `v0.2.0`). Each app pins a version, so differ
 apps can run different versions independently:
 
 ```
-mcp-service-sdk[mcp] @ git+https://github.com/sachinkaushik/edge-ai-libraries.git@mcp#subdirectory=libraries/mcp-service-sdk
+mcp-service-sdk[mcp] @ git+https://github.com/sachinkaushik/edge-ai-libraries.git@mcp#subdirectory=frameworks/mcp-service-sdk
 ```
 
 ## Status
