@@ -252,9 +252,10 @@ class ServiceServer:
         event_type: str,
         payload: dict[str, Any],
         ref_id: str | None = None,
+        ts_ms: int | None = None,
     ) -> EventEnvelope:
         """Emit-to-log-first, then fan out to enabled sinks (walkthrough §4)."""
-        event = new_event(event_type, self.service, self.store_id, payload, ref_id)
+        event = new_event(event_type, self.service, self.store_id, payload, ref_id, ts_ms)
         with self.telemetry.span(f"emit:{event_type}"):
             self.log.append(event)
             self.delivery.dispatch(event)

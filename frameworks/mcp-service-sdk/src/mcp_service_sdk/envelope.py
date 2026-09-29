@@ -45,6 +45,7 @@ def new_event(
     store_id: str,
     payload: dict[str, Any],
     ref_id: str | None = None,
+    ts_ms: int | None = None,
 ) -> EventEnvelope:
     """Convenience factory so services never build the envelope by hand."""
     kwargs: dict[str, Any] = {
@@ -55,4 +56,6 @@ def new_event(
     }
     if ref_id is not None:
         kwargs["ref_id"] = ref_id
+    if ts_ms is not None:
+        kwargs["ts_ms"] = ts_ms
     return EventEnvelope(**kwargs)

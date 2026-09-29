@@ -14,6 +14,7 @@ import json
 import os
 import sqlite3
 import threading
+from collections import deque
 from typing import Iterator, Protocol
 
 from .envelope import EventEnvelope
@@ -31,6 +32,9 @@ class DurableLog(Protocol):
         event_type: str | None = None,
         since_seq: int = 0,
         limit: int = 1000,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
+        newest_first: bool = False,
     ) -> list[EventEnvelope]:
         ...
 
@@ -65,6 +69,10 @@ class SQLiteLog:
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type)"
             )
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_events_type_ts_seq "
+                "ON events(event_type, ts_ms, seq)"
+            )
 
     def append(self, event: EventEnvelope) -> int:
         with self._lock, self._conn:
@@ -87,13 +95,22 @@ class SQLiteLog:
         event_type: str | None = None,
         since_seq: int = 0,
         limit: int = 1000,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
+        newest_first: bool = False,
     ) -> list[EventEnvelope]:
         query = "SELECT envelope FROM events WHERE seq > ?"
         params: list[object] = [since_seq]
         if event_type is not None:
             query += " AND event_type = ?"
             params.append(event_type)
-        query += " ORDER BY seq ASC LIMIT ?"
+        if start_ms is not None:
+            query += " AND ts_ms >= ?"
+            params.append(start_ms)
+        if end_ms is not None:
+            query += " AND ts_ms <= ?"
+            params.append(end_ms)
+        query += f" ORDER BY seq {'DESC' if newest_first else 'ASC'} LIMIT ?"
         params.append(limit)
         with self._lock:
             rows = self._conn.execute(query, params).fetchall()
@@ -174,8 +191,12 @@ class JSONLFileLog:
         event_type: str | None = None,
         since_seq: int = 0,
         limit: int = 1000,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
+        newest_first: bool = False,
     ) -> list[EventEnvelope]:
-        out: list[EventEnvelope] = []
+        out: list[EventEnvelope] | deque[EventEnvelope]
+        out = deque(maxlen=limit) if newest_first else []
         with self._lock:
             for rec in self._iter_records():
                 if int(rec["seq"]) <= since_seq:
@@ -183,10 +204,15 @@ class JSONLFileLog:
                 ev = rec["event"]
                 if event_type is not None and ev["event_type"] != event_type:
                     continue
+                if start_ms is not None and int(ev["ts_ms"]) < start_ms:
+                    continue
+                if end_ms is not None and int(ev["ts_ms"]) > end_ms:
+                    continue
                 out.append(EventEnvelope(**ev))
-                if len(out) >= limit:
+                if not newest_first and len(out) >= limit:
                     break
-        return out
+            events = list(out)
+            return list(reversed(events)) if newest_first else events
 
     def replay(self, from_seq: int = 0) -> Iterator[EventEnvelope]:
         with self._lock:
