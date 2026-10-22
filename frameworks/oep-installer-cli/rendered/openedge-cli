@@ -2214,6 +2214,16 @@ configure_edge_pack_graphics_display ()
     configure_edge_pack "$@";
     version="1.0"
 }
+configure_edge_pack_graphics_sriov () 
+{ 
+    configure_edge_pack "$@";
+    version="1.0"
+}
+configure_edge_pack_manageability () 
+{ 
+    configure_edge_pack "$@";
+    version="1.0"
+}
 configure_edge_pack_media_core () 
 { 
     configure_edge_pack "$@";
@@ -3445,6 +3455,10 @@ debian_20_group_edge_pack_graphics_display ()
 { 
     echo "render:992 video:"
 }
+debian_20_group_edge_pack_graphics_sriov () 
+{ 
+    echo "render:992 video:"
+}
 debian_20_group_edge_pack_npu () 
 { 
     echo "render:992"
@@ -3532,6 +3546,32 @@ debian_20_install_edge_pack_graphics_display ()
     [ -c /dev/dri/renderD128 ];
     ensure_group_add $(debian_20_group_edge_pack_graphics_display)
 }
+debian_20_install_edge_pack_graphics_sriov () 
+{ 
+    configure_edge_pack_graphics_sriov "$@";
+    if ensure_apt_is_installed intel-edge-graphics-sriov && [[ " $* " != *" --reinstall "* ]]; then
+        echo "intel-edge-graphics-sriov is installed." 1>&2;
+    else
+        ensure_prop set installed/edge_pack_graphics_sriov/owned true;
+        ensure_apt purge --auto-remove -y intel-edge-graphics-sriov || true;
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-graphics-sriov=$version*";
+        ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-graphics-sriov=$version*";
+    fi;
+    [ -c /dev/dri/renderD128 ];
+    ensure_group_add $(debian_20_group_edge_pack_graphics_sriov)
+}
+debian_20_install_edge_pack_manageability () 
+{ 
+    configure_edge_pack_manageability "$@";
+    if ensure_apt_is_installed intel-edge-manageability && [[ " $* " != *" --reinstall "* ]]; then
+        echo "intel-edge-manageability is installed." 1>&2;
+    else
+        ensure_prop set installed/edge_pack_manageability/owned true;
+        ensure_apt purge --auto-remove -y intel-edge-manageability || true;
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-manageability=$version*";
+        ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-manageability=$version*";
+    fi
+}
 debian_20_install_edge_pack_media_core () 
 { 
     configure_edge_pack_media_core "$@";
@@ -3577,6 +3617,14 @@ debian_20_profile_edge_pack_graphics_display ()
 { 
     echo "edge_pack"
 }
+debian_20_profile_edge_pack_graphics_sriov () 
+{ 
+    echo "edge_pack"
+}
+debian_20_profile_edge_pack_manageability () 
+{ 
+    echo "edge_pack"
+}
 debian_20_profile_edge_pack_media_core () 
 { 
     echo "edge_pack"
@@ -3619,6 +3667,18 @@ debian_20_remove_edge_pack_graphics_display ()
     ensure_apt purge --auto-remove -y intel-edge-graphics-display || true;
     debian_19_remove_edge_pack "$@" || true
 }
+debian_20_remove_edge_pack_graphics_sriov () 
+{ 
+    [ "$(ensure_prop get installed/edge_pack_graphics_sriov/owned)" = "true" ] || return 0;
+    ensure_apt purge --auto-remove -y intel-edge-graphics-sriov || true;
+    debian_19_remove_edge_pack "$@" || true
+}
+debian_20_remove_edge_pack_manageability () 
+{ 
+    [ "$(ensure_prop get installed/edge_pack_manageability/owned)" = "true" ] || return 0;
+    ensure_apt purge --auto-remove -y intel-edge-manageability || true;
+    debian_19_remove_edge_pack "$@" || true
+}
 debian_20_remove_edge_pack_media_core () 
 { 
     [ "$(ensure_prop get installed/edge_pack_media_core/owned)" = "true" ] || return 0;
@@ -3658,6 +3718,18 @@ debian_20_sbom_edge_pack_graphics_display ()
     configure_edge_pack_graphics_display "$@";
     debian_19_sbom_edge_pack_repo_entries "$@";
     ensure_sbom_format pkg-list "intel-edge-graphics-display=$version*"
+}
+debian_20_sbom_edge_pack_graphics_sriov () 
+{ 
+    configure_edge_pack_graphics_sriov "$@";
+    debian_19_sbom_edge_pack_repo_entries "$@";
+    ensure_sbom_format pkg-list "intel-edge-graphics-sriov=$version*"
+}
+debian_20_sbom_edge_pack_manageability () 
+{ 
+    configure_edge_pack_manageability "$@";
+    debian_19_sbom_edge_pack_repo_entries "$@";
+    ensure_sbom_format pkg-list "intel-edge-manageability=$version*"
 }
 debian_20_sbom_edge_pack_media_core () 
 { 
