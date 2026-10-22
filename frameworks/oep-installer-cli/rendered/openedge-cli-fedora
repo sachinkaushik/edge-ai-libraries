@@ -2008,7 +2008,9 @@ configure_dlstreamer ()
     od_model=yolov5m-640_INT8/FP16-INT8/yolov5m-640_INT8;
     od_model_proc=yolov5m-640_INT8/yolo-v5;
     oc_model=efficientnet-b0_INT8/FP16-INT8/efficientnet-b0;
-    model_repo=https://raw.githubusercontent.com/dlstreamer/pipeline-zoo-models/ee73878abc6fb6d864e59a5cd80016de4fc1d194
+    model_repo=https://raw.githubusercontent.com/dlstreamer/pipeline-zoo-models/ee73878abc6fb6d864e59a5cd80016de4fc1d194;
+    version_skills=tags/v2026.2.0;
+    repository_skills=https://github.com/open-edge-platform/dlstreamer.git
 }
 configure_docker_ce () 
 { 
@@ -2580,16 +2582,10 @@ ensure_rm ()
     for p in "$@";
     do
         [ -n "$p" ] || continue;
-        if [[ "$p" != /* ]]; then
-            echo "ensure_rm: refusing to remove relative path '$p'" 1>&2;
-            rc=3;
-            continue;
-        fi;
         norm="$(realpath -m -s -- "$p")";
         if [[ "$protected" = *" $norm "* ]]; then
             echo "ensure_rm: refusing to remove protected path '$p'" 1>&2;
-            rc=3;
-            continue;
+            return 3;
         fi;
         [ -e "$norm" ] || [ -L "$norm" ] || continue;
         rm -rf -- "$norm" 2> /dev/null || ensure_sudo rm -rf -- "$norm" || rc=$?;
@@ -2625,6 +2621,51 @@ ensure_select_device ()
     [[ "$args_uc" != *" --NPU "* ]] || [ ! -e /dev/accel/accel0 ] || device="npu";
     [[ "$args_uc" != *" --GPU "* ]] || [ ! -e /dev/dri/renderD128 ] || device="gpu";
     echo $device
+}
+ensure_skills () 
+{ 
+    local op="$1";
+    case "$op" in 
+        add)
+            local version="${2:?}";
+            local repository="${3:?}";
+            shift 3;
+            local tmpdir agent p;
+            ensure_tmpdir create tmpdir skills;
+            ensure_git_export "$tmpdir" "$version" "$repository" "$@";
+            mkdir -p "$HOME"/.agents/skills;
+            for p in "$@";
+            do
+                [ ! -e "$HOME"/.agents/skills/"${p##*/}" ] || ensure_rm "$HOME"/.agents/skills/"${p##*/}";
+                cp -r "$tmpdir/${p}" "$HOME"/.agents/skills;
+            done;
+            ensure_tmpdir destory "$tmpdir";
+            for agent in .claude .cursor .copilot .codex;
+            do
+                [ -d "$HOME/$agent/skills" ] || continue;
+                for p in "${@##*/}";
+                do
+                    if [[ -e "$HOME/$agent/skills/$name" || -L "$HOME/$agent/skills/$name" ]]; then
+                        ensure_rm "$HOME/$agent/skills/$p";
+                    fi;
+                    ln -sf "$HOME/.agents/skills/$p" "$HOME/$agent/skills/$p";
+                done;
+            done
+        ;;
+        remove)
+            set -x;
+            local name agent;
+            for agent in .agents .claude .cursor .copilot .codex;
+            do
+                for name in "${@##*/}";
+                do
+                    if [[ -e "$HOME/$agent/skills/$name" || -L "$HOME/$agent/skills/$name" ]]; then
+                        ensure_rm "$HOME/$agent/skills/$name";
+                    fi;
+                done;
+            done
+        ;;
+    esac
 }
 ensure_sudo () 
 { 
@@ -3138,7 +3179,9 @@ fedora_70_install_openvino ()
     else
         ensure_disk_size 1500;
         ensure_prop set installed/openvino/owned true;
+        echo "@@HINT Removing openvino";
         fedora_70_remove_openvino "$@";
+        echo "@@HINT Installing openvino-$version";
         printf "%s\n" "${yum_repo_conf[@]}" | ensure_sudo tee "$yum_repo_file";
         ensure_dnf install -y openvino-$version;
         verify_openvino;
@@ -3186,9 +3229,13 @@ fedora_75_install_dlstreamer ()
     else
         ensure_disk_size 15000;
         ensure_prop set installed/dlstreamer/owned true;
+        echo "@@HINT Removing intel-dlstreamer";
         fedora_75_remove_dlstreamer "$@";
         printf "%s\n" "${yum_repo_conf[@]}" | ensure_sudo tee "$yum_repo_file";
+        echo "@@HINT Installing intel-dlstreamer=$version";
         ensure_dnf install -y intel-dlstreamer=$version;
+        echo "@@HINT Installing skills";
+        ensure_skills add "$version_skills" "$repository_skills" .github/skills/dlstreamer-coding-agent;
         verify_dlstreamer;
         echo "intel-dlstreamer=$version installed successfully.";
     fi;
@@ -3866,6 +3913,7 @@ test_dlstreamer_pipeline ()
     if [[ " $* " = *" --validate "* ]]; then
         mkdir -p "$workspace";
         cd "$workspace";
+        echo "@@HINT Downloading models";
         { 
             mkdir -p models/${od_model%/*};
             [ -e models/$od_model.bin ] || ensure_fetch $model_repo/storage/$od_model.bin models/$od_model.bin || { 
@@ -3898,6 +3946,7 @@ test_dlstreamer_pipeline ()
         for device in ${!device_map[*]};
         do
             [ -e ${device_map[$device]} ] || continue;
+            echo "@@HINT Validating on $device";
             echo "Validating $od_model and $oc_model on device $device...";
             ( set -o pipefail;
             gst-launch-1.0 videotestsrc num-buffers=150 ! 'video/x-raw,format=BGRx,width=640,height=640' ! gvadetect model=models/$od_model.xml model_proc=models/$od_model.json device=$device ! gvainference model=models/$oc_model.xml device=$device ! gvafpscounter ! fakesink sync=false | ( info=0;
@@ -3920,6 +3969,7 @@ test_openvino ()
     if [[ " $* " = *" --validate "* ]]; then
         [ -r "$workspace"/${model##*/} ] || { 
             mkdir -p "$workspace";
+            echo "@@HINT Downloading ${model##*/}";
             ensure_fetch "$model" "$workspace"/${model##*/} || { 
                 echo "Failed to fetch ${model##*/}" 1>&2;
                 return 3
@@ -3927,6 +3977,7 @@ test_openvino ()
         };
         local benchmark_app="$(find "$workspace" -type f -name benchmark_app -perm -u+x || true)";
         [ -x "$benchmark_app" ] || { 
+            echo "@@HINT Building benchmark_app";
             mkdir -p "$workspace"/benchmark_app;
             cd "$workspace"/benchmark_app;
             cmake -S /usr/share/openvino/samples/cpp -B . -DCMAKE_BUILD_TYPE=Release;
@@ -3942,6 +3993,7 @@ test_openvino ()
         for device in ${!device_map[*]};
         do
             [ -e ${device_map[$device]} ] || continue;
+            echo "@@HINT Validating on $device";
             echo "Validating ${model##*/} inferencing on $device...";
             "$benchmark_app" -t 5 -m "$workspace"/${model##*/} -d $device --cache_dir "$workspace"/cache && validated+=("$device ok") || validated+=("$device failed");
         done;
