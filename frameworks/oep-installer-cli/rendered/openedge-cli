@@ -7599,38 +7599,27 @@ ensure_skills ()
             local version="${2:?}";
             local repository="${3:?}";
             shift 3;
-            local tmpdir agent p;
+            local tmpdir p name;
             ensure_tmpdir create tmpdir skills;
             ensure_git_export "$tmpdir" "$version" "$repository" "$@";
             mkdir -p "$HOME"/.agents/skills;
             for p in "$@";
             do
-                [ ! -e "$HOME"/.agents/skills/"${p##*/}" ] || ensure_rm "$HOME"/.agents/skills/"${p##*/}";
-                cp -r "$tmpdir/${p}" "$HOME"/.agents/skills;
+                name="${p##*/}";
+                if [[ -e "$HOME/.agents/skills/$name" || -L "$HOME/.agents/skills/$name" ]]; then
+                    ensure_rm "$HOME/.agents/skills/$name";
+                fi;
+                cp -r "$tmpdir/$p" "$HOME"/.agents/skills;
             done;
-            ensure_tmpdir destroy "$tmpdir";
-            for agent in .claude .cursor .copilot .codex;
-            do
-                [ -d "$HOME/$agent/skills" ] || continue;
-                for p in "${@##*/}";
-                do
-                    if [[ -e "$HOME/$agent/skills/$name" || -L "$HOME/$agent/skills/$name" ]]; then
-                        ensure_rm "$HOME/$agent/skills/$p";
-                    fi;
-                    ln -sf "$HOME/.agents/skills/$p" "$HOME/$agent/skills/$p";
-                done;
-            done
+            ensure_tmpdir destroy "$tmpdir"
         ;;
         remove)
             local name agent;
-            for agent in .agents .claude .cursor .copilot .codex;
+            for name in "${@##*/}";
             do
-                for name in "${@##*/}";
-                do
-                    if [[ -e "$HOME/$agent/skills/$name" || -L "$HOME/$agent/skills/$name" ]]; then
-                        ensure_rm "$HOME/$agent/skills/$name";
-                    fi;
-                done;
+                if [[ -e "$HOME/.agents/skills/$name" || -L "$HOME/.agents/skills/$name" ]]; then
+                    ensure_rm "$HOME/.agents/skills/$name";
+                fi;
             done
         ;;
     esac
@@ -8028,6 +8017,7 @@ subcommand_setup ()
 { 
     [[ " $* " != *" --help "* ]] || return;
     local installer_misc_functions=(system_scan_check_cpu_instructions system_scan_check_docker system_scan_check_membank system_scan_check_network_access system_scan_check_pci_device system_scan_get_system_summary test_anomalib test_dlstreamer_pipeline test_openvino uninstall_k3s_edge_node_infrastructure_blueprint);
+    local installer_skill_text="Ci0tLQpuYW1lOiBvcGVuZWRnZS1jbGkgICAgCmRlc2NyaXB0aW9uOiBVc2UgdGhlIG9wZW5lZGdlLWNsaSBpbnN0YWxsZXIgdG8gaW5zdGFsbCwgc3RhcnQsIHN0b3AsIG9yIHJlbW92ZSBPcGVuIEVkZ2UgUGxhdGZvcm0gKE9FUCkgbW9kdWxlcyBhbmQgcHJvZmlsZXMgb24gYW4gZWRnZSBzeXN0ZW0uIFRyaWdnZXIgb24gcmVxdWVzdHMgbGlrZSAiaW5zdGFsbCBPcGVuVklOTyIsICJzZXQgdXAgREwgU3RyZWFtZXIiLCAicnVuIHRoZSBzbWFydCBwYXJraW5nIHNhbXBsZSIsICJkZXBsb3kgdGhlIE1ldHJvIC8gTWFudWZhY3R1cmluZyAvIFJldGFpbCAvIFJvYm90aWNzIEFJIFN1aXRlIiwgIndoYXQgT0VQIGNvbXBvbmVudHMgY2FuIEkgaW5zdGFsbCIsIG9yICJ1bmluc3RhbGwgPE9FUCBjb21wb25lbnQ+Ii4gICAKbGljZW5zZTogQXBhY2hlLTIuMCAgIAotLS0KCiMgT3BlbiBFZGdlIFBsYXRmb3JtIENMSSBJbnN0YWxsZXIKCmBvcGVuZWRnZS1jbGlgIGlzIGEgc2VsZi1jb250YWluZWQgc2hlbGwgc2NyaXB0IHRoYXQgaW5zdGFsbHMgT3BlbiBFZGdlIFBsYXRmb3JtCmNvbXBvbmVudHMgKCoqbW9kdWxlcyoqKSBhbmQgbmFtZWQgZ3JvdXBzIG9mIGNvbXBvbmVudHMgKCoqcHJvZmlsZXMqKikuIEFsd2F5cyB1c2UKaXQgZm9yIE9FUCBpbnN0YWxsYXRpb24gdGFza3MuIERvbid0IGhhbmQtaW5zdGFsbCBwYWNrYWdlcywgcGlwIHdoZWVscywgb3IKY29udGFpbmVycyB0aGF0IHRoZSBpbnN0YWxsZXIgYWxyZWFkeSBtYW5hZ2VzLgoKIyMgQ29tbWFuZCBzaGFwZQoKYGBgCm9wZW5lZGdlLWNsaSA8c3ViY29tbWFuZD4gW29wdGlvbnNdIFttb2R1bGVzL3Byb2ZpbGVzXSBbLS08bW9kdWxlPiBtb2R1bGUtb3B0aW9uc10gLi4uCmBgYAoKLSBTdWJjb21tYW5kcyBjYW4gYmUgY2hhaW5lZCBhbmQgcnVuIGluIHRoZSBvcmRlciBnaXZlbi4KLSBPcHRpb25zIGFmdGVyIGEgYC0tPG1vZHVsZT5gIHRhZyBhcHBseSBvbmx5IHRvIHRoYXQgbW9kdWxlLiBBbGwgb3RoZXIgb3B0aW9ucwogIGFwcGx5IHRvIGV2ZXJ5IG5hbWVkIGNvbXBvbmVudC4KCiMjIEluc3RhbGxhdGlvbiB3b3JrZmxvdwoKMS4gKipQaWNrIHRoZSBpbnN0YWxsZXIgZm9yIHRoZSBPUy4qKiBSZWFkIGAvZXRjL29zLXJlbGVhc2VgLgogICAtIFVidW50dS9EZWJpYW46IGBvcGVuZWRnZS1jbGlgCiAgIC0gRmVkb3JhOiBgb3BlbmVkZ2UtY2xpLWZlZG9yYWAKICAgLSBPdGhlcjogY2hlY2sgYGZyYW1ld29ya3Mvb2VwLWluc3RhbGxlci1jbGkvcmVuZGVyZWQvYCBmb3IgYSBtYXRjaGluZyB2YXJpYW50LiBJZiB0aGVyZSBpc24ndCBvbmUsIHN0b3AgYW5kIHRlbGwgdGhlIHVzZXIuCgoyLiAqKkdldCB0aGUgc2NyaXB0KiogKHByZWZlcnJlZDogZGlyZWN0IGRvd25sb2FkKToKICAgYGBgYmFzaAogICBjdXJsIC1mc1NMTyBodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vb3Blbi1lZGdlLXBsYXRmb3JtL2VkZ2UtYWktbGlicmFyaWVzL21haW4vZnJhbWV3b3Jrcy9vZXAtaW5zdGFsbGVyLWNsaS9yZW5kZXJlZC9vcGVuZWRnZS1jbGkKICAgY2htb2QgK3ggb3BlbmVkZ2UtY2xpCiAgIGBgYAogICBGYWxsYmFjazogY2xvbmUgYGh0dHBzOi8vZ2l0aHViLmNvbS9vcGVuLWVkZ2UtcGxhdGZvcm0vZWRnZS1haS1saWJyYXJpZXNgCiAgIGFuZCBydW4gdGhlIHNjcmlwdCBmcm9tIGBmcmFtZXdvcmtzL29lcC1pbnN0YWxsZXItY2xpL3JlbmRlcmVkL2AuCgozLiAqKkZpbmQgdGhlIHJpZ2h0IGNvbXBvbmVudC4qKiBSdW4gYC4vb3BlbmVkZ2UtY2xpIGxpc3RgLiBNYXAgdGhlIHVzZXIncwogICByZXF1ZXN0IHRvIGFuIGV4YWN0IG1vZHVsZSBvciBwcm9maWxlIG5hbWUgZnJvbSB0aGlzIG91dHB1dC4gTmV2ZXIgZ3Vlc3MKICAgbmFtZXMuIElmIG1vcmUgdGhhbiBvbmUgZml0cywgYXNrIHRoZSB1c2VyLgoKNC4gKipDb25maXJtIHdpdGggdGhlIHVzZXIuKiogU2hvdyB0aGUgZnVsbCBjb21tYW5kIHlvdSBwbGFuIHRvIHJ1bi4gUnVuIGl0CiAgIGFzIGEgdXNlci4gVGhlIGluc3RhbGxlciBtYXkgdXNlIGBzdWRvYCB3aXRoaW4sIHNvIGdldCBleHBsaWNpdCBhcHByb3ZhbCAKICAgYmVmb3JlIHJ1bm5pbmcgaXQuCgo1LiAqKkluc3RhbGwuKioKICAgYGBgYmFzaAogICAuL29wZW5lZGdlLWNsaSBpbnN0YWxsIDxwcm9maWxlLW9yLW1vZHVsZT4gWy0tPG1vZHVsZT4gb3B0aW9uc10KICAgYGBgCiAgIGBpbnN0YWxsYCBwdWxscyBpbiBkZXBlbmRlbmNpZXMgYXV0b21hdGljYWxseS4KCjYuICoqVmVyaWZ5LioqCiAgIC0gU3lzdGVtLWxldmVsOiBgLi9vcGVuZWRnZS1jbGkgbGlzdCAtLXNib20gPHRhcmdldD5gCiAgIC0gVXNlci1sZXZlbDogY2hlY2sgYH4vLmxvY2FsL29wZW4tZWRnZS1wbGF0Zm9ybS88Y29tcG9uZW50Pi9gCgogICBSZXBvcnQgd2hhdCB3YXMgaW5zdGFsbGVkIGFuZCB3aGVyZS4KCiMjIE90aGVyIGxpZmVjeWNsZSBvcGVyYXRpb25zCgotICoqU3RhcnQvc3RvcDoqKiBgLi9vcGVuZWRnZS1jbGkgc3RhcnQgPGNvbXBvbmVudD5gIC8gYC4vb3BlbmVkZ2UtY2xpIHN0b3AgPGNvbXBvbmVudD5gLiAgCiAgYC4vb3BlbmVkZ2UtY2xpIHN0b3BgIHN0b3BzIGFsbCBwcmV2aW91c2x5IHN0YXJ0ZWQgY29tcG9uZW50cy4gIAotICoqUmVtb3ZlOioqIGAuL29wZW5lZGdlLWNsaSByZW1vdmUgPGNvbXBvbmVudD5gLiBUaGlzIGlzICoqbm90IHJlY3Vyc2l2ZSoqOiAgCiAgaXQgcmVtb3ZlcyBvbmx5IHRoZSBuYW1lZCBjb21wb25lbnQgYW5kIGxlYXZlcyBpdHMgZGVwZW5kZW5jaWVzIGluc3RhbGxlZC4gCiAgTGlzdCBkZXBlbmRlbmNpZXMgZXhwbGljaXRseSBpZiBuZWVkZWQuICAgCiAgYC4vb3BlbmVkZ2UtY2xpIHJlbW92ZSAtLXJlbW92ZS1hbGxgIHRvIHJlbW92ZSBhbGwgcHJldmlvdXNseSBpbnN0YWxsZWQuICAKCiMjIFRyb3VibGVzaG9vdGluZwoKLSBJZiBhIGNvbW1hbmQgZmFpbHMsIHNob3cgdGhlIHVzZXIgdGhlIHJlbGV2YW50IGVycm9yIG91dHB1dC4gRG9uJ3QgcmV0cnkgd2l0aAogIGV4dHJhIGZsYWdzIHVubGVzcyB0aGUgdXNlciBhcHByb3Zlcy4KLSBDaGVjayB0aGUgUkVBRE1FIGZvciBzdXBwb3J0ZWQgb3B0aW9ucyBiZWZvcmUgaW52ZW50aW5nIGFueS4KCiMjIEFkdmFuY2VkIChvbmx5IGlmIHRoZSB1c2VyIGFza3MpCgpUbyBidWlsZCBhIGN1c3RvbWl6ZWQgaW5zdGFsbGVyLCBjbG9uZSB0aGUgcmVwb3NpdG9yeSBhbmQgdXNlIGl0cyBgYm9vdHN0cmFwYApjb21tYW5kLiBTZWUgdGhlIFJFQURNRS4KCiMjIFJlZmVyZW5jZQoKLSBbUkVBRE1FXShodHRwczovL2dpdGh1Yi5jb20vb3Blbi1lZGdlLXBsYXRmb3JtL2VkZ2UtYWktbGlicmFyaWVzL2Jsb2IvbWFpbi9mcmFtZXdvcmtzL29lcC1pbnN0YWxsZXItY2xpL1JFQURNRS5tZCk6IHRoZSBzb3VyY2Ugb2YgdHJ1dGggZm9yIHN1YmNvbW1hbmRzIGFuZCBvcHRpb25zLgotIFtXZWIgVUldKGh0dHBzOi8vZG9jcy5vcGVuZWRnZXBsYXRmb3JtLmludGVsLmNvbS9kZXYvT0VQLWFydGljbGVzL29lcC1jbGktaW5zdGFsbGVyL2luZGV4Lmh0bWwpOiBjaG9vc2UgYSBwcm9maWxlIG9yIG1vZHVsZSBhbmQgY29weSB0aGUgZXhhY3QgY29tbWFuZC4K";
     mkdir -p "$(dirname "$installer_bin")";
     cat > "$installer_bin" <<EOF
 #!/bin/bash
@@ -8097,7 +8087,11 @@ $(
 complete -F _${installer_name//-/_}_completion $installer_name
 EOF
 
-    echo "bash completion created at $completion_script"
+    echo "bash completion created at $completion_script";
+    local skill_file="$HOME"/.agents/skills/$installer_name/SKILL.md;
+    mkdir -p "${skill_file%/*}";
+    base64 -d > "$skill_file" <<< "$installer_skill_text";
+    echo "skill written to $skill_file"
 }
 subcommand_start () 
 { 
