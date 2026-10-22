@@ -417,7 +417,7 @@ fi) 2>&1;
     else
         echo "Component not found" 1>&2;
         [[ " $* " = *" --dry-run "* ]] || rm -f "$mods_file";
-        exit 3;
+        return 3;
     fi
 }
 act_panelled_logs () 
@@ -1996,6 +1996,8 @@ configure_anomalib ()
     workspace="$(ensure_project_path)/anomalib";
     version=2.7.0;
     repository=https://github.com/open-edge-platform/anomalib.git;
+    version_skills=release-2026.2.0;
+    repository_skills=https://github.com/open-edge-platform/anomalib.git;
     skills=(anomalib-adding-a-datamodule anomalib-adding-a-model anomalib-tiled-ensemble anomalib-training anomalib-benchmarking)
 }
 configure_dlstreamer () 
@@ -2011,7 +2013,8 @@ configure_dlstreamer ()
     oc_model=efficientnet-b0_INT8/FP16-INT8/efficientnet-b0;
     model_repo=https://raw.githubusercontent.com/dlstreamer/pipeline-zoo-models/ee73878abc6fb6d864e59a5cd80016de4fc1d194;
     version_skills=tags/v2026.2.0;
-    repository_skills=https://github.com/open-edge-platform/dlstreamer.git
+    repository_skills=https://github.com/open-edge-platform/dlstreamer.git;
+    skills=(dlstreamer-coding-agent)
 }
 configure_docker_ce () 
 { 
@@ -2070,8 +2073,11 @@ EOF
 configure_geti () 
 { 
     workspace="$(ensure_project_path)/geti";
+    version_skills=release-2026.2.0;
+    repository_skills=https://github.com/open-edge-platform/skills.git;
+    skills=(geti-using-the-pipeline getitune-discovering-models getitune-exporting-a-model getitune-optimizing-a-model getitune-preparing-datasets getitune-running-inference getitune-training-a-model);
     image_name=ghcr.io/open-edge-platform/geti-xpu;
-    port=8080
+    used_ports=(8080)
 }
 configure_kernel_module_essential () 
 { 
@@ -2579,7 +2585,7 @@ ensure_ram_size ()
 ensure_rm () 
 { 
     local p norm rc=0;
-    local protected=" / /bin /boot /dev /etc /home /lib /lib64 /media /mnt /opt /proc /root /run /sbin /srv /sys /tmp /usr /var /etc/apt /etc/apt/keyrings /etc/apt/preferences.d /etc/apt/sources.list.d /etc/systemd /etc/systemd/system /usr/bin /usr/lib /usr/local /usr/share /usr/share/keyrings /var/lib $HOME $HOME/.local $HOME/.local/bin $(ensure_project_path) ";
+    local protected=" / /bin /boot /dev /etc /home /lib /lib64 /media /mnt /opt /proc /root /run /sbin /srv /sys /tmp /usr /var /etc/apt /etc/apt/keyrings /etc/apt/preferences.d /etc/apt/sources.list.d /etc/systemd /etc/systemd/system /usr/bin /usr/lib /usr/local /usr/share /usr/share/keyrings /var/lib $HOME $HOME/.local $HOME/.local/bin ";
     for p in "$@";
     do
         [ -n "$p" ] || continue;
@@ -2637,22 +2643,15 @@ ensure_skills ()
             mkdir -p "$HOME"/.agents/skills;
             for p in "$@";
             do
-                name="${p##*/}";
-                if [[ -e "$HOME/.agents/skills/$name" || -L "$HOME/.agents/skills/$name" ]]; then
-                    ensure_rm "$HOME/.agents/skills/$name";
-                fi;
+                ensure_rm "$HOME/.agents/skills/${p##*/}";
                 cp -r "$tmpdir/$p" "$HOME"/.agents/skills;
             done;
             ensure_tmpdir destroy "$tmpdir"
         ;;
         remove)
-            local name agent;
-            for name in "${@##*/}";
-            do
-                if [[ -e "$HOME/.agents/skills/$name" || -L "$HOME/.agents/skills/$name" ]]; then
-                    ensure_rm "$HOME/.agents/skills/$name";
-                fi;
-            done
+            local names=("${@##*/}");
+            local spath="$HOME/.agents/skills/";
+            ensure_rm "${names[@]/#/"$spath"}"
         ;;
     esac
 }
@@ -3224,7 +3223,7 @@ fedora_75_install_dlstreamer ()
         echo "@@STEP Installing intel-dlstreamer=$version";
         ensure_dnf install -y intel-dlstreamer=$version;
         echo "@@STEP Installing skills";
-        ensure_skills add "$version_skills" "$repository_skills" .github/skills/dlstreamer-coding-agent;
+        ensure_skills add "$version_skills" "$repository_skills" "${skills[@]/#/.github/skills/}";
         verify_dlstreamer;
         echo "intel-dlstreamer=$version installed successfully.";
     fi;
@@ -3242,7 +3241,8 @@ fedora_75_remove_dlstreamer ()
     configure_dlstreamer;
     [ "$(ensure_prop get installed/dlstreamer/owned)" = "true" ] || return 0;
     ensure_dnf autoremove -y $(dnf list --installed | grep openvino | awk '{print$1}') || true;
-    ensure_rm "$workspace"
+    ensure_rm "$workspace" || true;
+    ensure_skills remove "${skills[@]}"
 }
 fedora_75_sbom_dlstreamer () 
 { 
@@ -3267,7 +3267,7 @@ fedora_80_install_anomalib ()
         . .venv/bin/activate;
         pip install "anomalib[openvino,cpu]==${version}";
         echo "@@STEP Installing skills";
-        ensure_skills add tags/lib/v$version $repository "${skills[@]/#/.agents/skills/}";
+        ensure_skills add "$version_skills" "$repository_skills" "${skills[@]/#/.agents/skills/}";
         verify_anomalib;
     fi;
     test_anomalib "$@";
@@ -3280,7 +3280,7 @@ fedora_80_profile_anomalib ()
 fedora_80_remove_anomalib () 
 { 
     configure_anomalib $*;
-    ensure_rm "$workspace";
+    ensure_rm "$workspace" || true;
     ensure_skills remove "${skills[@]}"
 }
 fedora_90_install_geti () 
@@ -3336,8 +3336,12 @@ install_geti ()
         echo "Geti is installed." 1>&2;
     else
         ensure_disk_size 20000;
-        ensure_ports_open install geti "$port";
+        ensure_ram_size 16777216;
+        ensure_ports_open install geti "${used_ports[@]}";
+        echo "@@STEP Pulling image";
         docker pull $image_name;
+        echo "@@STEP Installing skills";
+        ensure_skills add "$version_skills" "$repository_skills" "${skills[@]/#/.agents/skills/}";
     fi
 }
 install_system_inspection () 
@@ -3410,16 +3414,18 @@ remove_geti ()
 { 
     stop_geti "$@";
     docker image rm -f $image_name || true;
-    ensure_rm "$workspace"
+    ensure_rm "$workspace";
+    ensure_skills remove "${skills[@]}"
 }
 start_geti () 
 { 
     configure_geti "$@";
-    ensure_ports_open start geti "$port";
+    ensure_ports_open start geti "${used_ports[@]}";
     mkdir -p "$workspace"/geti-data;
-    docker run --rm --name geti-app -d -v "$workspace"/geti-data:/application/data:rw -e HOST=0.0.0.0 -e PORT=$port -p $port:$port -e http_proxy -e https_proxy -e no_proxy -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY $([ ! -d /dev/dri ] || echo "--device /dev/dri:/dev/dri") --group-add $(getent group render | cut -d: -f3 || echo 992) --group-add $(id -g) --shm-size 8g $image_name;
-    echo "@@HIGHLIGHT URL: http://$(ensure_ip):$port";
-    echo "@@HIGHLIGHT workspace: $workspace/geti-data"
+    docker run --rm --name geti-app -d -v "$workspace"/geti-data:/application/data:rw -e HOST=0.0.0.0 -e PORT=${used_ports[0]} -p ${used_ports[0]}:${used_ports[0]} -e http_proxy -e https_proxy -e no_proxy -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY $([ ! -d /dev/dri ] || echo "--device /dev/dri:/dev/dri") --group-add $(getent group render | cut -d: -f3 || echo 992) --group-add $(id -g) --shm-size 8g $image_name;
+    echo "@@HIGHLIGHT URL: http://$(ensure_ip):${used_ports[0]}";
+    echo "@@HIGHLIGHT workspace: ${workspace/#"$HOME"/"~"}/geti-data";
+    echo "@@HIGHLIGHT $installer_name stop|remove"
 }
 stop_geti () 
 { 
@@ -3577,10 +3583,22 @@ subcommand_remove ()
         echo "  --dry-run       dry-run operations";
         echo "  --continue      ignore errors and proceed to the end";
         echo "  --remove-all    remove all previously installed components";
+        echo "  --remove-me     remove $install_name";
         echo;
         return 0;
     fi;
-    act_helper "remove,Removal,Removing,Removed" "-r" "$@"
+    local rc=0;
+    act_helper "remove,Removal,Removing,Removed" "-r" "$@" || rc=$?;
+    if [[ " $* " = *" --remove-me "* ]]; then
+        ensure_rm "$HOME/.local/bin/$installer_name" "$HOME/.local/share/bash-completion/completions/$installer_name" "$HOME/.agents/skills/$installer_name" && echo "$installer_name removed";
+        if [[ " $* " = *" --remove-all "* ]]; then
+            ensure_rm "$(ensure_project_path)";
+            echo "$installer_name logs removed";
+        else
+            echo "$(ensure_project_path) left unchanged";
+        fi;
+    fi;
+    return $rc
 }
 subcommand_setup () 
 { 
