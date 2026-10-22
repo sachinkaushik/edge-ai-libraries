@@ -7025,7 +7025,7 @@ debian_90_stop_wind_turbine_anomaly_detection ()
 debian_99_install_system_summary () 
 { 
     echo "@@REPORT SYSTEM SUMMARY";
-    install_system_inspection "$@"
+    install_system_inspection "$@" || true
 }
 debian_99_profile_computer_vision () 
 { 
@@ -7582,7 +7582,7 @@ ensure_sbom_format ()
         ;;
         *)
             echo "Unsupported SBOM key: $key" 1>&2;
-            exit 3
+            return 3
         ;;
     esac
 }
@@ -8013,7 +8013,7 @@ subcommand_remove ()
         echo "  --dry-run       dry-run operations";
         echo "  --continue      ignore errors and proceed to the end";
         echo "  --remove-all    remove all previously installed components";
-        echo "  --remove-me     remove $install_name";
+        echo "  --remove-me     remove $installer_name";
         echo;
         return 0;
     fi;
