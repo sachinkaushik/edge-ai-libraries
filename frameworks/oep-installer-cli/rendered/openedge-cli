@@ -1664,16 +1664,18 @@ act_panelled_logs ()
         fi;
         AT_SEG=();
         _attention_active && _attention_build;
-        local now_s=${EPOCHREALTIME%.*};
+        local now_s=${EPOCHREALTIME%.*} at_wipe=0;
         if (( ${#AT_LINES[@]} || now_s < AT_GUARD )) && (( now_s != AT_SEC )); then
             AT_SEC=$now_s;
             FULL_CLEAR=1;
+            at_wipe=1;
         fi;
         local out="" l r rowstr;
         if (( FULL_CLEAR )); then
             PREV=();
             FULL_CLEAR=0;
         fi;
+        (( at_wipe )) && printf -v out '\033[%d;1H\033[K' "$rows";
         _title_text "$REVIEW" "$TITLE_WORD";
         _title_row "$usable";
         rowstr=$TITLEROW${AT_SEG[1]:-};
@@ -1722,8 +1724,7 @@ act_panelled_logs ()
                 fi;
             done;
         fi;
-        printf -v out '%s\033[%d;%dr\033[%d;1H' "$out" $(( rows - 1 )) "$rows" "$rows";
-        printf '\033[?2026h%s\033[?2026l' "$out";
+        [[ -n $out ]] && printf '\033[?2026h%s\033[?2026l' "$out";
         FRAMES=$(( FRAMES + 1 ));
         DRAW_MS=$(( DRAW_MS + $(_now_ms) - t0 ));
         DRAWING=0
@@ -7904,8 +7905,8 @@ ensure_sudo ()
                 (( fd > 2 )) && eval "exec $fd>&-";
             done 2> /dev/null;
             while kill -0 $ppid 2> /dev/null; do
-                sleep 60;
                 sudo -n -v 2> /dev/null || break;
+                sleep 60;
             done;
             ensure_prop remove pids/sudo/pid$ppid ) < /dev/null > /dev/null 2>&1 & pid=$!;
             ensure_prop create pids/sudo/pid$ppid;
@@ -8004,6 +8005,7 @@ install_geti ()
 }
 install_reboot () 
 { 
+    [ "$(ensure_prop get reboot_requested)" = "true" ] || return 0;
     ensure_prop remove reboot_requested;
     subcommand_setup;
     [ -x "$installer_bin" ] || { 
@@ -8018,11 +8020,11 @@ install_reboot ()
     echo "@@ATTENTION @@BR";
     echo "@@ATTENTION SYSTEM REBOOT REQUIRED";
     echo "@@ATTENTION @@BR";
-    echo "@@ATTENTION RERUN WITH '$installer_name resume' AFTER SYSTEM IS BACK.";
+    echo "@@ATTENTION RERUN '$installer_name resume' AFTER SYSTEM IS BACK.";
     echo "@@ATTENTION @@BR";
     echo "@@ATTENTION @@UNTIL +$(( delay * 60 )) Rebooting in %s (cancel: sudo shutdown -c)";
     echo "@@ATTENTION @@BR";
-    echo "@@HIGHLIGHT $installer_name resume";
+    echo "@@HIGHLIGHT RERUN $installer_name resume";
     ensure_sudo shutdown -r +$delay && sleep infinity
 }
 install_system_inspection () 
