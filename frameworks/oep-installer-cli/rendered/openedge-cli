@@ -223,10 +223,8 @@ act_find_parents ()
 { 
     local targets=" $1 ";
     shift;
-    local installed="$(ensure_project_path)/$installer_name/installed";
-    [ -d "$installed" ] || return 0;
     local p d;
-    for p in $(cd "$installed"; ls -1);
+    for p in $(ensure_prop find "installed/*" | cut -f2 -d/ | uniq);
     do
         [[ "$targets" != *" $p "* ]] || continue;
         for d in $(act_expand_modules install $p "$@");
@@ -276,7 +274,6 @@ act_helper ()
     local sort_options="$2";
     shift;
     shift;
-    local mods_file="$(ensure_project_path)/$installer_name/modules";
     local explicit_mods="$(act_extract_modules $act_name "$@")";
     local remove_all=0;
     if [[ "$act_name" = "remove" && " $* " = *" --remove-all "* ]]; then
@@ -381,16 +378,14 @@ act_helper ()
                     echo "Invoke $handler with $invoke_args";
                     echo "@@OK $name1";
                 else
-                    local started_path="$(ensure_project_path)/$installer_name/started/$name1";
-                    local installed_path="$(ensure_project_path)/$installer_name/installed/$name1";
-                    [ "$act_name" = "start" ] && mkdir -p "$started_path";
-                    [ "$act_name" = "install" ] && mkdir -p "$installed_path";
+                    [ "$act_name" = "start" ] && ensure_prop create started/$name1/;
+                    [ "$act_name" = "install" ] && ensure_prop create installed/$name1/;
                     echo "@@COMP $name1";
                     local rc1=0;
                     ( set -e;
                     $handler $invoke_args ) & wait $! || rc1=$?;
-                    [[ " stop remove " = *" $act_name "* ]] && rm -rf "$started_path";
-                    [ "$act_name" = "remove" ] && [ $rc1 -eq 0 ] && rm -rf "$installed_path" 2> /dev/null;
+                    [[ " stop remove " = *" $act_name "* ]] && ensure_prop remove started/$name1/;
+                    [ "$act_name" = "remove" ] && [ $rc1 -eq 0 ] && ensure_prop remove installed/$name1/;
                     if [ $rc1 -eq 0 ]; then
                         echo "@@OK $name1";
                     else
@@ -411,15 +406,12 @@ else
 fi) 2>&1;
         wait;
         ensure_tmpdir destroy $installer_state;
-        if [[ " $* " != *" --dry-run "* && -n "${explicit_mods// }" ]]; then
-            mkdir -p "${mods_file%/*}";
-            echo "$explicit_mods" > "$mods_file";
-        fi;
-        [[ $remove_all -eq 1 && $rc -eq 0 && " $* " != *" --dry-run "* ]] && rm -f "$mods_file";
+        [[ " $* " != *" --dry-run "* && -n "${explicit_mods// }" ]] && ensure_prop set modules "$explicit_mods";
+        [[ $remove_all -eq 1 && $rc -eq 0 && " $* " != *" --dry-run "* ]] && ensure_prop remove modules;
         return $rc;
     else
         echo "Component not found" 1>&2;
-        [[ " $* " = *" --dry-run "* ]] || rm -f "$mods_file";
+        [[ " $* " = *" --dry-run "* ]] || ensure_prop remove modules;
         return 3;
     fi
 }
@@ -1979,16 +1971,13 @@ act_resolve_args ()
     shift;
     local args=("$@") margs=(${*##-*});
     if [ "$act_name" = "stop" ] && [ ${#margs[@]} -eq 0 ]; then
-        local started_path="$(ensure_project_path)/$installer_name/started";
-        [ -d "$started_path" ] && args+=($(cd "$started_path"; ls -1));
+        args+=($(ensure_prop find "started/*" | cut -f2 -d/ | uniq));
     else
         if [ "$act_name" = "remove" ] && [[ " $* " = *" --remove-all "* ]] && [ -z "$(act_extract_modules $act_name "$@")" ]; then
-            local installed_path="$(ensure_project_path)/$installer_name/installed";
-            [ -d "$installed_path" ] && args+=($(cd "$installed_path"; ls -1));
+            args+=($(ensure_prop find "installed/*" | cut -f2 -d/ | uniq));
         else
             if [ "$act_name" != "stop" ] && [ -z "$(act_extract_modules $act_name "$@")" ]; then
-                local mods_file="$(ensure_project_path)/$installer_name/modules";
-                [ ! -r "$mods_file" ] || args=($(< "$mods_file") "${args[@]}");
+                args=($(ensure_prop get modules) "${args[@]}");
             fi;
         fi;
     fi;
@@ -2188,9 +2177,10 @@ configure_edge_pack ()
     edge_pack_source="deb [signed-by=$edge_pack_key_file] https://$edge_pack_repo/edgepack $VERSION_CODENAME stable";
     edge_pack_list_file=/etc/apt/sources.list.d/intel-edge-pack.list;
     edge_pack_pref=("Package: *" "Pin: origin $edge_pack_repo" "Pin-Priority: 1001");
-    edge_pack_pref_file=/etc/apt/preferences.d/edgepack.pref;
+    edge_pack_pref_file=/etc/apt/preferences.d/intel-edge-pack.pref;
+    edge_pack_incompatible_pref_files=(/etc/apt/preferences.d/priorities /etc/apt/preferences.d/edgepack.pref);
     edge_pack_install_options=("--no-install-recommends");
-    edge_pack_allow_downgrades=(libgbm1 libgstreamer-gl1.0-0 libva-wayland2 mesa-libgallium weston libegl-mesa0 libgbm-dev libgl1-mesa-dev libgl1-mesa-dri libglx-mesa0 mesa-common-dev mesa-vulkan-drivers);
+    edge_pack_allow_downgrades=(libgbm1 libgstreamer-gl1.0-0 libva-wayland2 mesa-libgallium weston libegl-mesa0 libgbm-dev libgl1-mesa-dev libgl1-mesa-dri libglx-mesa0 mesa-common-dev mesa-vulkan-drivers mesa-opencl-icd);
     edge_pack_ppa_repo=;
     edge_pack_ppa_key_url=;
     edge_pack_ppa_key_file=;
@@ -2483,7 +2473,7 @@ configure_libyang ()
 }
 configure_libze1 () 
 { 
-    if [[ " $* " = *" edge_pack_npu "* && " $* " != *" linux_image_generic_7.0 "* ]]; then
+    if [[ " $* " = *" edge_pack_npu "* ]]; then
         version=1.28.2;
         libze1_deb="https://snapshot.ppa.launchpadcontent.net/kobuk-team/intel-graphics/ubuntu/20260606T100000Z/pool/main/l/level-zero-loader/libze1_1.28.2-1~${VERSION_ID}~ppa1_amd64.deb";
     else
@@ -3384,27 +3374,6 @@ debian_15_sbom_yq ()
 { 
     ensure_sbom_format pkg-list yq
 }
-debian_20_install_core_types () 
-{ 
-    if [ -e /etc/core-types ] && [[ " $* " != *" --reinstall "* ]]; then
-        echo "/etc/core-types exists." 1>&2;
-    else
-        ensure_prop set installed/core_types/owned true;
-        local script="https://raw.githubusercontent.com/open-edge-platform/edge-workloads-and-benchmarks/refs/heads/main/utils/obtain_cores.sh";
-        set -o pipefail;
-        ensure_fetch "$script" - | bash | sed -n -E 's/^[[:space:]]*([a-zA-Z0-9_-]+)[[:space:]]*:[[:space:]]*(.*)/\U\1\E=\2/p' | ensure_sudo tee /etc/core-types;
-        echo "@@HIGHLIGHT Core types are detected and written to /etc/core-types";
-    fi
-}
-debian_20_profile_core_types () 
-{ 
-    [ "$1" != "install" ] || echo "cpuid curl"
-}
-debian_20_remove_core_types () 
-{ 
-    [ "$(ensure_prop get installed/core_types/owned)" = "true" ] || return 0;
-    ensure_rm /etc/core-types
-}
 debian_25_install_linux_image_6.18_intel () 
 { 
     if [[ "$(uname -r)" = "6.18-intel" ]]; then
@@ -3436,11 +3405,19 @@ debian_25_profile_linux_image_6.18_intel ()
 }
 debian_25_profile_linux_image_generic_7.0 () 
 { 
-    [[ "$(uname -r)" = 7.0*generic ]] || echo "reboot"
+    echo "reboot"
+}
+debian_25_sbom_linux_image_6.18_intel () 
+{ 
+    ensure_sbom_format pkg-list linux-image-6.18-intel
+}
+debian_25_sbom_linux_image_generic_7.0 () 
+{ 
+    ensure_sbom_format pkg-list linux-image-generic-7.0
 }
 debian_29_install_reboot () 
 { 
-    [ -e "${installer_state?}"/reboot_required ] || return;
+    [[ -e "${installer_state?}"/reboot_required && -x "$installer_bin" && -n "$(ensure_prop get command)" ]] || return;
     echo "@@STEP Rebooting";
     local reboot_message="RERUN '$installer_name resume' AFTER SYSTEM IS BACK.";
     echo "@@HIGHLIGHT $reboot_message";
@@ -3714,7 +3691,7 @@ debian_30_remove_rsync ()
 }
 debian_30_remove_rustup () 
 { 
-    "$HOME"/.cargo/bin/rustup self uninstall || true
+    yes | "$HOME"/.cargo/bin/rustup self uninstall || true
 }
 debian_30_remove_stress_ng () 
 { 
@@ -3811,6 +3788,52 @@ debian_30_sbom_xpu_smi ()
 { 
     ensure_sbom_format pkg-list xpu-smi
 }
+debian_39_install_edge_pack () 
+{ 
+    configure_edge_pack "$@";
+    local reinstall=$([[ " $* " = *" --reinstall "* ]] && echo 1 || echo 0);
+    local reconfigured=0;
+    if [ ! -e "$edge_pack_key_file" ] || [ $reinstall -eq 1 ]; then
+        ensure_apt_key "$edge_pack_key_file" "$edge_pack_key_url" --dearmor;
+        reconfigured=1;
+    fi;
+    if [ ! -e "$edge_pack_source_file" ] || [ $reinstall -eq 1 ]; then
+        ensure_apt_source "$edge_pack_list_file" "$edge_pack_source";
+        reconfigured=1;
+    fi;
+    if [ ! -e "$edge_pack_pref_file" ] || [ $reinstall -eq 1 ]; then
+        ensure_apt_preference "$edge_pack_pref_file" "${edge_pack_pref[@]}";
+        local p;
+        for p in "${edge_pack_incompatible_pref_files[@]}";
+        do
+            [ ! -f "$p" ] || ensure_sudo mv -f "$p" "$p".save;
+        done;
+        reconfigured=1;
+    fi;
+    if [ -n "$edge_pack_ppa_repo" ]; then
+        if [ ! -e "$edge_pack_ppa_key_file" ] || [ $reinstall -eq 1 ]; then
+            ensure_apt_key "$edge_pack_ppa_key_file" "$edge_pack_ppa_key_url" --dearmor;
+            reconfigured=1;
+        fi;
+        if [ ! -e "$edge_pack_ppa_source_file" ] || [ $reinstall -eq 1 ]; then
+            ensure_apt_source "$edge_pack_ppa_list_file" "$edge_pack_ppa_source";
+            reconfigured=1;
+        fi;
+    fi;
+    [ $reconfigured -eq 0 ] || ensure_apt update -y
+}
+debian_39_profile_edge_pack () 
+{ 
+    echo "curl gnupg linux_image_generic_7.0"
+}
+debian_39_remove_edge_pack () 
+{ 
+    dpkg -l | grep -q -F intel-edge- || { 
+        configure_edge_pack "$@";
+        ensure_rm "$edge_pack_key_file" "$edge_pack_source_file" "$edge_pack_pref_file";
+        [ -z "$edge_pack_ppa_repo" ] || ensure_rm "$edge_pack_ppa_list_file" "$edge_pack_ppa_key_file"
+    }
+}
 debian_40_group_edge_pack_base_realtime () 
 { 
     echo "render:992 video:"
@@ -3849,7 +3872,6 @@ debian_40_install_edge_pack_base_realtime ()
     if ensure_apt_is_installed intel-edge-base-realtime && [[ " $* " != *" --reinstall "* ]]; then
         echo "intel-edge-base-realtime is installed." 1>&2;
     else
-        install_edge_pack_repo_entries "$@";
         local candidate;
         candidate="$(apt-cache policy intel-edge-base-realtime 2> /dev/null | awk '/Candidate:/{print $2}')";
         if [ -z "$candidate" ] || [ "$candidate" = "(none)" ]; then
@@ -3867,7 +3889,7 @@ debian_40_install_edge_pack_base_realtime ()
         ensure_prop remove installed/edge_pack_base_realtime/fallback;
         ensure_prop set installed/edge_pack_base_realtime/owned true;
         ensure_apt purge --auto-remove -y intel-edge-base-realtime || true;
-        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-base-realtime=$version*";
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-base-realtime=$version*" || true;
         ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-base-realtime=$version*";
     fi;
     [ -c /dev/dri/renderD128 ];
@@ -3880,9 +3902,8 @@ debian_40_install_edge_pack_base_standard ()
         echo "intel-edge-base-standard is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_base_standard/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-base-standard || true;
-        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-base-standard=$version*";
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-base-standard=$version*" || true;
         ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-base-standard=$version*";
     fi;
     [ -c /dev/dri/renderD128 ];
@@ -3895,9 +3916,8 @@ debian_40_install_edge_pack_graphics_core ()
         echo "intel-edge-graphics-core is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_graphics_core/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-graphics-core || true;
-        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-graphics-core=$version*";
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-graphics-core=$version*" || true;
         ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-graphics-core=$version*";
     fi;
     [ -c /dev/dri/renderD128 ];
@@ -3910,9 +3930,8 @@ debian_40_install_edge_pack_graphics_display ()
         echo "intel-edge-graphics-display is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_graphics_display/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-graphics-display || true;
-        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-graphics-display=$version*";
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-graphics-display=$version*" || true;
         ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-graphics-display=$version*";
     fi;
     [ -c /dev/dri/renderD128 ];
@@ -3925,9 +3944,8 @@ debian_40_install_edge_pack_graphics_sriov ()
         echo "intel-edge-graphics-sriov is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_graphics_sriov/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-graphics-sriov || true;
-        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-graphics-sriov=$version*";
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-graphics-sriov=$version*" || true;
         ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-graphics-sriov=$version*";
     fi;
     [ -c /dev/dri/renderD128 ];
@@ -3940,9 +3958,8 @@ debian_40_install_edge_pack_manageability ()
         echo "intel-edge-manageability is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_manageability/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-manageability || true;
-        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-manageability=$version*";
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-manageability=$version*" || true;
         ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-manageability=$version*";
     fi
 }
@@ -3953,7 +3970,6 @@ debian_40_install_edge_pack_media_core ()
         echo "intel-edge-media-core is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_media_core/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-media-core || true;
         ensure_apt install "${edge_pack_install_options[@]}" "intel-edge-media-core=$version*";
     fi
@@ -3965,9 +3981,8 @@ debian_40_install_edge_pack_npu ()
         echo "intel-edge-npu is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_npu/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-npu || true;
-        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-npu=$version*";
+        ensure_apt_allow_downgrades "${edge_pack_allow_downgrades[*]}" "${edge_pack_install_options[@]}" "intel-edge-npu=$version*" || true;
         ensure_apt install --allow-downgrades "${edge_pack_install_options[@]}" "intel-edge-npu=$version*";
     fi;
     [ -c /dev/accel/accel0 ];
@@ -4113,7 +4128,6 @@ debian_40_remove_edge_pack_base_realtime ()
     if [ "$(ensure_prop get installed/edge_pack_base_realtime/fallback)" != "true" ]; then
         [ "$(ensure_prop get installed/edge_pack_base_realtime/owned)" = "true" ] || return 0;
         ensure_apt purge --auto-remove -y intel-edge-base-realtime || true;
-        remove_edge_pack_repo_entries "$@" || true;
     else
         debian_40_remove_edge_pack_base_standard "$@";
     fi;
@@ -4122,44 +4136,37 @@ debian_40_remove_edge_pack_base_realtime ()
 debian_40_remove_edge_pack_base_standard () 
 { 
     [ "$(ensure_prop get installed/edge_pack_base_standard/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-base-standard || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-base-standard || true
 }
 debian_40_remove_edge_pack_graphics_core () 
 { 
     [ "$(ensure_prop get installed/edge_pack_graphics_core/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-graphics-core || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-graphics-core || true
 }
 debian_40_remove_edge_pack_graphics_display () 
 { 
     [ "$(ensure_prop get installed/edge_pack_graphics_display/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-graphics-display || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-graphics-display || true
 }
 debian_40_remove_edge_pack_graphics_sriov () 
 { 
     [ "$(ensure_prop get installed/edge_pack_graphics_sriov/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-graphics-sriov || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-graphics-sriov || true
 }
 debian_40_remove_edge_pack_manageability () 
 { 
     [ "$(ensure_prop get installed/edge_pack_manageability/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-manageability || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-manageability || true
 }
 debian_40_remove_edge_pack_media_core () 
 { 
     [ "$(ensure_prop get installed/edge_pack_media_core/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-media-core || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-media-core || true
 }
 debian_40_remove_edge_pack_npu () 
 { 
     [ "$(ensure_prop get installed/edge_pack_npu/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-npu || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-npu || true
 }
 debian_40_remove_gpu_accel () 
 { 
@@ -4519,6 +4526,18 @@ debian_55_sbom_ros_openvino ()
     echo "---";
     ensure_sbom_format pkg-list curl gnupg
 }
+debian_60_install_core_types () 
+{ 
+    if [ -e /etc/core-types ] && [[ " $* " != *" --reinstall "* ]]; then
+        echo "/etc/core-types exists." 1>&2;
+    else
+        ensure_prop set installed/core_types/owned true;
+        local script="https://raw.githubusercontent.com/open-edge-platform/edge-workloads-and-benchmarks/refs/heads/main/utils/obtain_cores.sh";
+        set -o pipefail;
+        ensure_fetch "$script" - | bash | sed -n -E 's/^[[:space:]]*([a-zA-Z0-9_-]+)[[:space:]]*:[[:space:]]*(.*)/\U\1\E=\2/p' | ensure_sudo tee /etc/core-types;
+        echo "@@HIGHLIGHT Core types are detected and written to /etc/core-types";
+    fi
+}
 debian_60_install_edge_node_infrastructure_blueprint () 
 { 
     configure_edge_node_infrastructure_blueprint $*;
@@ -4552,9 +4571,18 @@ debian_60_install_edge_node_infrastructure_blueprint ()
     echo "@@HIGHLIGHT deployment model: $deployment";
     echo "@@HIGHLIGHT workspace: ${workspace/#"$HOME"/"~"}"
 }
+debian_60_profile_core_types () 
+{ 
+    [ "$1" != "install" ] || echo "cpuid curl"
+}
 debian_60_profile_edge_node_infrastructure_blueprint () 
 { 
     echo "git make curl docker_io"
+}
+debian_60_remove_core_types () 
+{ 
+    [ "$(ensure_prop get installed/core_types/owned)" = "true" ] || return 0;
+    ensure_rm /etc/core-types
 }
 debian_60_remove_edge_node_infrastructure_blueprint () 
 { 
@@ -4569,7 +4597,6 @@ debian_70_install_edge_pack_media_ffmpeg ()
         echo "intel-edge-media-ffmpeg is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_media_ffmpeg/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-media-ffmpeg || true;
         ensure_apt install "${edge_pack_install_options[@]}" "intel-edge-media-ffmpeg=$version*";
     fi
@@ -4581,7 +4608,6 @@ debian_70_install_edge_pack_media_gst ()
         echo "intel-edge-media-gst is installed." 1>&2;
     else
         ensure_prop set installed/edge_pack_media_gst/owned true;
-        install_edge_pack_repo_entries "$@";
         ensure_apt purge --auto-remove -y intel-edge-media-gst || true;
         ensure_apt install "${edge_pack_install_options[@]}" "intel-edge-media-gst=$version*";
     fi
@@ -4665,14 +4691,12 @@ debian_70_profile_time_confighub ()
 debian_70_remove_edge_pack_media_ffmpeg () 
 { 
     [ "$(ensure_prop get installed/edge_pack_media_ffmpeg/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-media-ffmpeg || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-media-ffmpeg || true
 }
 debian_70_remove_edge_pack_media_gst () 
 { 
     [ "$(ensure_prop get installed/edge_pack_media_gst/owned)" = "true" ] || return 0;
-    ensure_apt purge --auto-remove -y intel-edge-media-gst || true;
-    remove_edge_pack_repo_entries "$@" || true
+    ensure_apt purge --auto-remove -y intel-edge-media-gst || true
 }
 debian_70_remove_ffmpeg () 
 { 
@@ -7138,10 +7162,6 @@ debian_99_profile_edge_base ()
         ;;
     esac
 }
-debian_99_profile_edge_pack () 
-{ 
-    echo "curl gnupg linux_image_generic_7.0"
-}
 debian_99_profile_federal_and_aerospace_ai_suite () 
 { 
     [ "$1" = "start" ] || echo "edge_node_infrastructure_blueprint handheld_multi_modal uav_mission_compute_sdk"
@@ -7236,7 +7256,7 @@ flag&&$1{for(i=1;i<=NF;i++)print$i}
         [[ " ${allow_downgrades[*]} " = *" $dg "* ]] || downgrades+=("$dg");
     done;
     if [ ${#downgrades[*]} -gt 0 ]; then
-        echo "Detected unexpected downgrades: ${downgrades[*]}" 1>&2;
+        printf "${red}Detected unexpected downgrades: %s${reset}\n" "${downgrades[*]}" 1>&2;
         return 3;
     fi
 }
@@ -7643,7 +7663,8 @@ ensure_prop ()
     local key_base="$(ensure_project_path)/${installer_name:?}";
     case "$op" in 
         set)
-            printf '%s' "$value" > "$key_base/$key_path"
+            ( umask 077;
+            printf '%s' "$value" > "$key_base/$key_path" )
         ;;
         get)
             [ -r "$key_base/$key_path" ] && cat "$key_base/$key_path" || printf '%s' "$value"
@@ -7652,10 +7673,16 @@ ensure_prop ()
             ( cd "$key_base" && find . -ipath "./$key_path" -print 2> /dev/null | cut -f2- -d/ )
         ;;
         create)
-            mkdir -p "$key_base/${key_path%/*}"
+            mkdir -m 700 -p "$key_base/${key_path%/*}"
         ;;
-        destroy)
-            [ ! -r "$key_base/$key_path" ] || rm -f "$key_base/$key_path"
+        remove)
+            if [ -f "$key_base/$key_path" ]; then
+                rm -f "$key_base/$key_path";
+            else
+                if [[ "$key_path" = */ && -d "$key_base/${key_path%/}" ]]; then
+                    rm -rf "$key_base/${key_path%/}";
+                fi;
+            fi
         ;;
     esac
 }
@@ -7770,7 +7797,7 @@ ensure_sudo ()
                 sleep 60;
                 sudo -n -v 2> /dev/null || break;
             done;
-            ensure_prop destroy pids/sudo/pid$ppid ) < /dev/null > /dev/null 2>&1 & pid=$!;
+            ensure_prop remove pids/sudo/pid$ppid ) < /dev/null > /dev/null 2>&1 & pid=$!;
             ensure_prop create pids/sudo/pid$ppid;
             ensure_prop set pids/sudo/pid$ppid "$pid";
             disown $pid;
@@ -7849,35 +7876,6 @@ ensure_trap ()
             stack+=("$script");
         fi;
     done
-}
-install_edge_pack_repo_entries () 
-{ 
-    configure_edge_pack "$@";
-    local reinstall=$([[ " $* " = *" --reinstall "* ]] && echo 1 || echo 0);
-    local reconfigured=0;
-    if [ ! -e "$edge_pack_key_file" ] || [ $reinstall -eq 1 ]; then
-        ensure_apt_key "$edge_pack_key_file" "$edge_pack_key_url" --dearmor;
-        reconfigured=1;
-    fi;
-    if [ ! -e "$edge_pack_source_file" ] || [ $reinstall -eq 1 ]; then
-        ensure_apt_source "$edge_pack_list_file" "$edge_pack_source";
-        reconfigured=1;
-    fi;
-    if [ ! -e "$edge_pack_pref_file" ] || [ $reinstall -eq 1 ]; then
-        ensure_apt_preference "$edge_pack_pref_file" "${edge_pack_pref[@]}";
-        reconfigured=1;
-    fi;
-    if [ -n "$edge_pack_ppa_repo" ]; then
-        if [ ! -e "$edge_pack_ppa_key_file" ] || [ $reinstall -eq 1 ]; then
-            ensure_apt_key "$edge_pack_ppa_key_file" "$edge_pack_ppa_key_url" --dearmor;
-            reconfigured=1;
-        fi;
-        if [ ! -e "$edge_pack_ppa_source_file" ] || [ $reinstall -eq 1 ]; then
-            ensure_apt_source "$edge_pack_ppa_list_file" "$edge_pack_ppa_source";
-            reconfigured=1;
-        fi;
-    fi;
-    [ $reconfigured -eq 0 ] || ensure_apt update -y
 }
 install_geti () 
 { 
@@ -7959,14 +7957,6 @@ install_system_inspection ()
     done;
     echo "----------------------------------------------------------------";
     [ "$net_pass" = "$ok" ] ) | ensure_columns
-}
-remove_edge_pack_repo_entries () 
-{ 
-    dpkg -l | grep -q -F intel-edge- || { 
-        configure_edge_pack "$@";
-        ensure_rm "$edge_pack_key_file" "$edge_pack_source_file" "$edge_pack_pref_file";
-        [ -z "$edge_pack_ppa_repo" ] || ensure_rm "$edge_pack_ppa_list_file" "$edge_pack_ppa_key_file"
-    }
 }
 remove_geti () 
 { 
