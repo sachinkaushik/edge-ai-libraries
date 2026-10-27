@@ -106,15 +106,16 @@ make format      # Auto-format with ruff
 
 ### Individual Make Targets
 
-| Target          | Description                           |
-|-----------------|---------------------------------------|
-| `make build`    | Build all Docker images               |
-| `make run`      | Start all services via Docker Compose |
-| `make stop`     | Stop all services                     |
-| `make clean`    | Stop and remove containers/volumes    |
-| `make shell`    | Open shell in vippet container        |
-| `make shell-ui` | Open shell in UI container            |
-| `make test`     | Run tests in Docker                   |
+| Target              | Description                                                          |
+| ------------------- | -------------------------------------------------------------------- |
+| `make build`        | Build all Docker images                                              |
+| `make run`          | Start all services via Docker Compose                                |
+| `make run-prebuilt` | Pull and start the published images (`latest` on main); never builds |
+| `make stop`         | Stop all services                                                    |
+| `make clean`        | Stop and remove containers/volumes                                   |
+| `make shell`        | Open shell in vippet container                                       |
+| `make shell-ui`     | Open shell in UI container                                           |
+| `make test`         | Run tests in Docker                                                  |
 
 ## API
 
@@ -168,29 +169,30 @@ Hardware profiles (`COMPOSE_PROFILES`): `cpu`, `gpu`, `npu` — set automaticall
 
 ## Key Environment Variables (vippet service)
 
-| Variable                         | Description                                                  | Default                                                    |
-|----------------------------------|--------------------------------------------------------------|------------------------------------------------------------|
-| `APP_LOG_LEVEL`                  | Python logging level for the application                     | `INFO`                                                     |
-| `RUNNER_LOG_LEVEL`               | Logging level for gst_runner.py subprocess                   | `INFO`                                                     |
-| `WEB_SERVER_LOG_LEVEL`           | Logging level for uvicorn web server                         | `WARNING`                                                  |
-| `GST_DEBUG`                      | GStreamer native debug level (integer, 0-9)                  | `1`                                                        |
-| `MODELS_PATH`                    | Path to downloaded models                                    | `/models/output`                                           |
-| `AUTO_VIDEO_DIR`                 | Path to auto-downloaded videos                               | `/videos/input/auto`                                       |
-| `UPLOADED_VIDEO_DIR`             | Path to user-uploaded videos                                 | `/videos/input/uploaded`                                   |
-| `DEFAULT_RECORDINGS_FILE`        | Path to the YAML listing recordings to auto-download         | `/videos/default_recordings.yaml`                          |
-| `UPLOAD_ALLOWED_EXTENSIONS`      | Comma-separated allow-list of upload file extensions         | `mp4,mkv,mov,avi,ts,264,avc,h265,hevc`                     |
-| `UPLOAD_ALLOWED_CONTAINERS`      | Comma-separated allow-list of upload container formats       | `mp4,mov,mkv,avi,mpegts,raw`                               |
-| `UPLOAD_ALLOWED_CODECS`          | Comma-separated allow-list of upload video codecs            | `h264,h265`                                                |
-| `UPLOAD_MAX_SIZE_BYTES`          | Maximum accepted upload body size in bytes                   | `2147483648` (2 GiB)                                       |
-| `OUTPUT_VIDEO_DIR`               | Path to output videos                                        | `/videos/output`                                           |
-| `UPLOADED_IMAGES_DIR`            | Path to user-uploaded image sets                             | `/images/input/uploaded`                                   |
-| `SIMPLE_VIEW_VISIBLE_ELEMENTS`   | Glob patterns for elements shown in simplified pipeline view | `*src,urisourcebin,gva*,*sink,source,videoscale`           |
-| `SIMPLE_VIEW_INVISIBLE_ELEMENTS` | Element names hidden from simplified pipeline view           | `gvafpscounter,gvametapublish,gvametaconvert,gvawatermark` |
-| `LIVE_STREAM_SERVER_HOST`        | RTSP server hostname                                         | `mediamtx`                                                 |
-| `LIVE_STREAM_SERVER_PORT`        | RTSP server port                                             | `8554`                                                     |
-| `RTSPSRC_DEFAULT_LATENCY_MS`     | Default latency in ms for rtspsrc elements                   | `100`                                                      |
-| `COMPOSE_PROFILES`               | Hardware profile (cpu/gpu/npu)                               | Auto-detected                                              |
-| `PYTHONPATH`                     | Python module search path                                    | `/app`                                                     |
+| Variable                           | Description                                                  | Default                                                    |
+| ---------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| `APP_LOG_LEVEL`                    | Python logging level for the application                     | `INFO`                                                     |
+| `RUNNER_LOG_LEVEL`                 | Logging level for gst_runner.py subprocess                   | `INFO`                                                     |
+| `WEB_SERVER_LOG_LEVEL`             | Logging level for uvicorn web server                         | `WARNING`                                                  |
+| `GST_DEBUG`                        | GStreamer native debug level (integer, 0-9)                  | `1`                                                        |
+| `MODELS_PATH`                      | Path to downloaded models                                    | `/models/output`                                           |
+| `AUTO_VIDEO_DIR`                   | Path to auto-downloaded videos                               | `/videos/input/auto`                                       |
+| `UPLOADED_VIDEO_DIR`               | Path to user-uploaded videos                                 | `/videos/input/uploaded`                                   |
+| `DEFAULT_RECORDINGS_FILE`          | Path to the YAML listing recordings to auto-download         | `/videos/default_recordings.yaml`                          |
+| `UPLOAD_ALLOWED_EXTENSIONS`        | Comma-separated allow-list of upload file extensions         | `mp4,mkv,mov,avi,ts,264,avc,h265,hevc`                     |
+| `UPLOAD_ALLOWED_CONTAINERS`        | Comma-separated allow-list of upload container formats       | `mp4,mov,mkv,avi,mpegts,raw`                               |
+| `UPLOAD_ALLOWED_CODECS`            | Comma-separated allow-list of upload video codecs            | `h264,h265`                                                |
+| `UPLOAD_MAX_SIZE_BYTES`            | Maximum accepted upload body size in bytes                   | `2147483648` (2 GiB)                                       |
+| `OUTPUT_VIDEO_DIR`                 | Path to output videos                                        | `/videos/output`                                           |
+| `UPLOADED_IMAGES_DIR`              | Path to user-uploaded image sets                             | `/images/input/uploaded`                                   |
+| `SIMPLE_VIEW_VISIBLE_ELEMENTS`     | Glob patterns for elements shown in simplified pipeline view | `*src,urisourcebin,gva*,*sink,source,videoscale`           |
+| `SIMPLE_VIEW_INVISIBLE_ELEMENTS`   | Element names hidden from simplified pipeline view           | `gvafpscounter,gvametapublish,gvametaconvert,gvawatermark` |
+| `LIVE_STREAM_SERVER_HOST`          | RTSP server hostname                                         | `mediamtx`                                                 |
+| `LIVE_STREAM_SERVER_PORT`          | RTSP server port                                             | `8554`                                                     |
+| `RTSPSRC_DEFAULT_LATENCY_MS`       | Default latency in ms for rtspsrc elements                   | `100`                                                      |
+| `BENCHMARK_ENABLE_LATENCY_METRICS` | Enable DLStreamer latency tracer for benchmark test cases    | `true`                                                     |
+| `COMPOSE_PROFILES`                 | Hardware profile (cpu/gpu/npu)                               | Auto-detected                                              |
+| `PYTHONPATH`                       | Python module search path                                    | `/app`                                                     |
 
 ## Important Notes for AI Agents
 
@@ -215,18 +217,18 @@ Swagger/OpenAPI automatically renders markdown as beautiful documentation
 Example:
 
 ```python
-@app.route('/pipelines', methods=['POST']) 
+@app.route('/pipelines', methods=['POST'])
 def create_pipeline(body: schemas.PipelineDefinition) -> JSONResponse:
     """
     # Create Pipeline
-    
+
     Create a new user-defined pipeline with automatic metadata generation.
-    
+
     ## Operation
     1. Enforce `USER_CREATED` source
     2. Delegate to `PipelineManager.add_pipeline()`
     3. Return generated pipeline ID
-    
+
     ## Auto-Generated Fields
     The backend automatically sets:
     - Pipeline ID (generated from name)
@@ -234,7 +236,7 @@ def create_pipeline(body: schemas.PipelineDefinition) -> JSONResponse:
     - Variant IDs (generated from variant names)
     - Variant `read_only=False` for all variants
     - Pipeline `thumbnail=None` (user-created pipelines)
-    
+
     ## Request Body
     **`PipelineDefinition`** with:
     - `name` *(required)* - Non-empty pipeline name
@@ -242,7 +244,7 @@ def create_pipeline(body: schemas.PipelineDefinition) -> JSONResponse:
     - `source` *(ignored)* - Forced to `USER_CREATED`
     - `tags` *(optional)* - List of categorization tags
     - `variants` *(required)* - List of `VariantCreate` objects
-    
+
     ## Response Codes
 
     | Code | Description |
@@ -260,7 +262,7 @@ def create_pipeline(body: schemas.PipelineDefinition) -> JSONResponse:
     ### ❌ Failure
     - Invalid pipeline definition → 400
     - Unhandled error → 500
-    
+
     ## Examples
 
     ### Request
@@ -278,7 +280,7 @@ def create_pipeline(body: schemas.PipelineDefinition) -> JSONResponse:
       ]
     }
     ```
-    
+
     ### Success Response (201)
     ```json
     {
@@ -306,18 +308,18 @@ Example:
 def calculate_total(items, tax_rate=0.23):
     """
     Calculate total price including tax for given items.
-    
+
     Args:
         items (list): List of dictionaries containing item data with 'price' key
         tax_rate (float, optional): Tax rate as decimal. Defaults to 0.23.
-    
+
     Returns:
         float: Total price including tax, rounded to 2 decimal places
-    
+
     Raises:
         ValueError: If tax_rate is negative or items list is empty
         KeyError: If any item missing 'price' key
-    
+
     Example:
         >>> items = [{'price': 10.0}, {'price': 20.0}]
         >>> calculate_total(items, 0.20)
