@@ -97,17 +97,28 @@ docker run --rm -i --user "$(id -u):$(id -g)" \
   -w /home/dlstreamer \
   -e http_proxy -e https_proxy -e no_proxy \
   -v "$PWD:/home/dlstreamer" \
-  intel/dlstreamer:2026.3.0-ubuntu24-rc1 bash -s <<'EOF'
+  intel/dlstreamer:2026.3.0-ubuntu24-rc2 bash -s <<'EOF'
 set -euo pipefail
 
 cd /home/dlstreamer/
 
 mkdir -p ai-tolling/src/dlstreamer-pipeline-server/models/public
+
+cd /opt/intel/dlstreamer/scripts/download_models
+
 export MODELS_PATH=/home/dlstreamer/ai-tolling/src/dlstreamer-pipeline-server/models
-/opt/intel/dlstreamer/samples/download_public_models.sh yolov10s
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv .ultralytics_models_venv
+source .ultralytics_models_venv/bin/activate
+uv pip install --index-strategy unsafe-best-match -r requirements_download_ultralytics_models.txt
+python3 download_ultralytics_models.py --model yolov10s --outdir ${MODELS_PATH}/public/yolov10s/FP32/
+
+cd /home/dlstreamer/
 
 mkdir -p ai-tolling/src/dlstreamer-pipeline-server/models/intel
 
+# Image PYTHONPATH shadows the venv's openvino-dev, hiding Model Optimizer (mo)
+unset PYTHONPATH
 python3 -m venv /tmp/omz-venv
 source /tmp/omz-venv/bin/activate
 python3 -m pip install --no-cache-dir "openvino-dev[onnx,tensorflow2]==2024.6.0"
